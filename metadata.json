@@ -1,0 +1,6 @@
+{
+  "name": "Bukit Randu Hospitality",
+  "description": "Pengalaman reservasi dan keramahan resor bukit mewah dengan pemandangan panorama Bandar Lampung.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

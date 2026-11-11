@@ -1,0 +1,212 @@
+---
+name: Bukit Randu Hospitality
+colors:
+  surface: '#f7f9fb'
+  surface-dim: '#d8dadc'
+  surface-bright: '#f7f9fb'
+  surface-container-lowest: '#ffffff'
+  surface-container-low: '#f2f4f6'
+  surface-container: '#eceef0'
+  surface-container-high: '#e6e8ea'
+  surface-container-highest: '#e0e3e5'
+  on-surface: '#191c1e'
+  on-surface-variant: '#3f4a3e'
+  inverse-surface: '#2d3133'
+  inverse-on-surface: '#eff1f3'
+  outline: '#6f7a6d'
+  outline-variant: '#becabb'
+  surface-tint: '#006e2d'
+  primary: '#005e26'
+  on-primary: '#ffffff'
+  primary-container: '#007a33'
+  on-primary-container: '#a1ffad'
+  inverse-primary: '#77dc88'
+  secondary: '#735c00'
+  on-secondary: '#ffffff'
+  secondary-container: '#fed65b'
+  on-secondary-container: '#745c00'
+  tertiary: '#912c46'
+  on-tertiary: '#ffffff'
+  tertiary-container: '#b0445d'
+  on-tertiary-container: '#ffe3e6'
+  error: '#ba1a1a'
+  on-error: '#ffffff'
+  error-container: '#ffdad6'
+  on-error-container: '#93000a'
+  primary-fixed: '#93f9a2'
+  primary-fixed-dim: '#77dc88'
+  on-primary-fixed: '#002109'
+  on-primary-fixed-variant: '#005320'
+  secondary-fixed: '#ffe088'
+  secondary-fixed-dim: '#e9c349'
+  on-secondary-fixed: '#241a00'
+  on-secondary-fixed-variant: '#574500'
+  tertiary-fixed: '#ffd9de'
+  tertiary-fixed-dim: '#ffb2be'
+  on-tertiary-fixed: '#400014'
+  on-tertiary-fixed-variant: '#83213c'
+  background: '#f7f9fb'
+  on-background: '#191c1e'
+  surface-variant: '#e0e3e5'
+typography:
+  display-lg:
+    fontFamily: Playfair Display
+    fontSize: 56px
+    fontWeight: '600'
+    lineHeight: 64px
+    letterSpacing: -0.02em
+  display-lg-mobile:
+    fontFamily: Playfair Display
+    fontSize: 36px
+    fontWeight: '600'
+    lineHeight: 44px
+    letterSpacing: -0.01em
+  headline-lg:
+    fontFamily: Playfair Display
+    fontSize: 40px
+    fontWeight: '600'
+    lineHeight: 48px
+    letterSpacing: -0.01em
+  headline-lg-mobile:
+    fontFamily: Playfair Display
+    fontSize: 28px
+    fontWeight: '600'
+    lineHeight: 36px
+  headline-md:
+    fontFamily: Playfair Display
+    fontSize: 30px
+    fontWeight: '500'
+    lineHeight: 38px
+  headline-md-mobile:
+    fontFamily: Playfair Display
+    fontSize: 24px
+    fontWeight: '500'
+    lineHeight: 32px
+  headline-sm:
+    fontFamily: Playfair Display
+    fontSize: 22px
+    fontWeight: '500'
+    lineHeight: 28px
+  title-lg:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: '600'
+    lineHeight: 26px
+  title-md:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: '600'
+    lineHeight: 24px
+  body-lg:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: '400'
+    lineHeight: 28px
+  body-md:
+    fontFamily: Inter
+    fontSize: 15px
+    fontWeight: '400'
+    lineHeight: 24px
+  body-sm:
+    fontFamily: Inter
+    fontSize: 13px
+    fontWeight: '400'
+    lineHeight: 20px
+  label-md:
+    fontFamily: Inter
+    fontSize: 13px
+    fontWeight: '600'
+    lineHeight: 18px
+    letterSpacing: 0.04em
+  label-sm:
+    fontFamily: Inter
+    fontSize: 11px
+    fontWeight: '600'
+    lineHeight: 16px
+    letterSpacing: 0.06em
+rounded:
+  sm: 0.125rem
+  DEFAULT: 0.25rem
+  md: 0.375rem
+  lg: 0.5rem
+  xl: 0.75rem
+  full: 9999px
+spacing:
+  gutter: 1.5rem
+  gutter-mobile: 1rem
+  margin: 3rem
+  margin-mobile: 1.25rem
+  space-xs: 0.25rem
+  space-sm: 0.5rem
+  space-md: 1rem
+  space-lg: 1.5rem
+  space-xl: 2.5rem
+---
+
+## Brand & Style
+
+This design system embodies refined hill-resort hospitality, balancing the classic, welcoming heritage of an established global hotel chain with the scenic elegance of Bandar Lampung’s panoramic Bukit Randu hilltop location. The design language merges contemporary luxury minimalism with high-end editorial clarity, crafting an experience that feels tranquil, reliable, and prestigious.
+
+Targeted at leisure travelers, business delegates, and event planners, the visual approach replaces sterile corporate patterns with deliberate spatial breathing room, tailored serif typography, and tactile warmth. The emotional response sought is serene confidence, effortless discovery, and authentic prestige.
+
+## Colors
+
+The palette establishes an organic luxury atmosphere rooted in emerald greenery, luminous clean slates, and warm metallic accents:
+
+- **Primary (`#007A33`)**: Emerald Green reflects the lush hill landscapes of Bukit Randu and anchors core calls to action, brand touchpoints, active states, and focal badges.
+- **Secondary (`#D4AF37`)**: Warm Gold serves as an intentional jewel accent for ratings, VIP tiers, reservation highlights, subtle dividing borders, and special promotional touches.
+- **Neutral (`#F8FAFC`)**: Light Slate establishes a crisp, glare-free canvas that elevates crisp white cards (`#FFFFFF`) with subtle contrast.
+- **Text & Contrast Tier**: Deep forest-slate (`#0F1F17`) is used for primary text rather than stark black, maintaining soft editorial contrast, paired with muted slate (`#475569`) for metadata and micro-copy.
+
+## Typography
+
+The type system blends classical hospitality literature with precise functional ergonomics:
+
+- **Playfair Display** commands major guest-facing surfaces: property highlights, suite titles, booking section headings, and promotional storytelling. Generous leading prevents collisions with accented letterforms.
+- **Inter** handles data-heavy reservation inputs, room pricing breakdowns, filter sidebars, and booking confirmation schedules with pristine optical legibility across all screen densities.
+- **Micro-labels and Overlines** utilize uppercase Inter with slight letter-spacing (`0.04em`–`0.06em`) to denote categories, dates, and status pills without visual clutter.
+
+## Layout & Spacing
+
+A 12-column responsive fluid grid governs desktop viewports, condensing to an 8-column layout on tablets and a single-column sequence on mobile.
+
+- **Desktop (>= 1280px)**: 12-column layout with 24px gutters and generous 48px outer canvas margins, giving room showcases, amenity lists, and reservation date-pickers room to breathe.
+- **Tablet (768px - 1279px)**: 8-column format with 20px gutters and 32px canvas margins; room summary sidebars collapse gracefully into sticky bottom bars or expandable trays.
+- **Mobile (< 768px)**: 4-column flow with 16px gutters and 20px margins. Multi-step checkout processes transition into full-width stepping flows with fixed bottom booking summaries.
+
+## Elevation & Depth
+
+Visual hierarchy avoids heavy drop shadows, instead using architectural lighting cues inspired by sunlit hill vistas:
+
+- **Base Surfaces**: The background rests on Light Slate (`#F8FAFC`). Layered cards utilize Pure White (`#FFFFFF`) with a featherweight 1px border tinted in Slate-200 (`#E2E8F0`).
+- **Floating Controls & Datepickers**: Employ an ambient, green-tinted shadow (`rgba(0, 45, 19, 0.06)`) with a 24px blur and 6px vertical offset, producing soft suspension without harsh boundaries.
+- **Interactive Hover States**: Room tiles and key discovery cards subtly elevate by shifting their shadow to `0 12px 32px -4px rgba(0, 45, 19, 0.10)` alongside a border transition toward subtle Warm Gold (`#D4AF37`).
+- **Modals & Drawers**: Backed by a high-opacity soft scrim (`rgba(15, 31, 23, 0.45)`) combined with a 4px backdrop blur, isolating booking flows with cinematic focus.
+
+## Shapes
+
+The design system maintains a **Soft** radius (`roundedness: 1`), conveying architectural precision and understated luxury. 
+
+- Form controls, input groups, and standard buttons employ an exact `0.25rem` (4px) or `0.375rem` (6px) corner radius, avoiding overly bubbly or playful aesthetics.
+- Featured room imagery, suite gallery cards, and modal dialogs adopt `0.5rem` (8px) for balanced framing.
+- Status badges and pill tags use full circular ends (`9999px`) to create clear shape differentiation from interactive rectangular inputs and cards.
+
+## Components
+
+### Buttons
+- **Primary**: Solid Emerald Green (`#007A33`) background with crisp white typography, 12px vertical and 24px horizontal padding, and an understated hover transition to a deeper forest green (`#005F27`).
+- **Secondary / Accent**: Warm Gold border or tint (`#D4AF37`) with Emerald Green text for secondary booking actions (e.g., "View Room Details").
+- **Ghost / Tertiary**: Transparent base with dark slate text, turning subtly green on hover, reserved for inline amenity disclosures and navigational links.
+
+### Form Inputs & Date Pickers
+- **Reservation Date Range & Room Selectors**: Structured as wide segmented modules with pure white fill, hairline gray borders, and Playfair Display numerals for dates paired with small Inter uppercase labels.
+- **Text Fields**: Inter 15px, inset padding of 14px 16px, transitioning to an active Emerald Green border ring on focus.
+
+### Room & Amenity Cards
+- Composed of a 16:10 high-resolution photography header with subtle gold amenity badges ("Panoramic Hill View", "King Bed"), followed by Playfair Display suite names, a clean breakdown of rates per night, and a clear call-to-action button aligned to the bottom right.
+
+### Chips & Filter Tags
+- Compact 28px height, rounded pill shape, resting in a muted slate border with subtle gold star iconography for guest reviews and ratings. Active states fill with deep Emerald Green and white text.
+
+### Reservation Tables & Rate Breakdowns
+- Inter 13px/15px with alternate row shading (`#FFFFFF` to `#F8FAFC`), crisp 1px borders, aligned tabular figures for currency numbers, and gold checkmarks for included amenities (breakfast, pool access, high-speed Wi-Fi).
