@@ -15,7 +15,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreSuites, onCheckDates }) => 
       {/* Background Image with Measured Contrast Scrim */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/src/assets/images/bukit_randu_hero_1794410439341.jpg"
+          src="/assets/images/bukit_randu_hero_1794410439341.jpg"
           alt="Resor Bukit Randu dengan pemandangan panorama Teluk Bandar Lampung"
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover object-center transform scale-105 transition-transform duration-1000 ease-out"

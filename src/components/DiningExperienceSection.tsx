@@ -48,7 +48,7 @@ export const DiningExperienceSection: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
             <div className="lg:col-span-7 relative min-h-[340px] lg:min-h-[460px]">
               <img
-                src="/src/assets/images/dining_hilltop_1794410440842.jpg"
+                src="/assets/images/dining_hilltop_1794410440842.jpg"
                 alt="Teras Makan Malam Romantis Restoran Bukit Randu saat senja"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"

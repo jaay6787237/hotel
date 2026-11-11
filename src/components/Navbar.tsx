@@ -73,22 +73,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Lokasi & Kontak
             </button>
-            <button
-              onClick={onOpenSqlModal}
-              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors whitespace-nowrap cursor-pointer"
-              title="Lihat Arsitektur Basis Data: Trigger, SP, SF, Subquery, & Multi-Join"
-            >
-              <Database className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Arsitektur SQL</span>
-            </button>
-            <button
-              onClick={onOpenApiKeyModal}
-              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 text-slate-800 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors whitespace-nowrap cursor-pointer"
-              title="Keamanan Data: Manajemen Kunci API PostgreSQL (SHA-256)"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-              <span>Keamanan API</span>
-            </button>
           </nav>
 
           {/* Zone 3: 1 primary action + currency switcher */}
@@ -156,26 +140,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="block w-full text-left py-2 text-base font-medium text-slate-800 hover:text-[#007A33]"
           >
             Lokasi & Kontak
-          </button>
-          <button
-            onClick={() => {
-              setMobileMenuOpen(false);
-              onOpenSqlModal();
-            }}
-            className="flex items-center gap-2 w-full text-left py-2 text-base font-medium text-emerald-800 hover:text-emerald-950"
-          >
-            <Database className="w-4 h-4 text-emerald-600" />
-            <span>Arsitektur SQL & RDBMS</span>
-          </button>
-          <button
-            onClick={() => {
-              setMobileMenuOpen(false);
-              onOpenApiKeyModal();
-            }}
-            className="flex items-center gap-2 w-full text-left py-2 text-base font-medium text-amber-800 hover:text-amber-950"
-          >
-            <KeyRound className="w-4 h-4 text-amber-600" />
-            <span>Keamanan Data & API Key</span>
           </button>
           <div className="pt-2">
             <button
