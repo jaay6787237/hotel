@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../lib/firebase-admin.ts';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { db } from '../db/index.ts';
+import { db, isUsingSupabasePg } from '../db/index.ts';
 import { apiKeys } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import { supabaseAdmin, isUsingSupabaseApi } from '../lib/supabase-admin.ts';
 
 export interface AuthenticatedRequest extends Request {
   user?: DecodedIdToken | { uid: string; email: string; role: string; type: 'user' };
@@ -14,6 +15,62 @@ export interface AuthenticatedRequest extends Request {
 // SHA-256 helper for API Key validation
 export function hashApiKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+async function findMatchingActiveApiKey(rawKey: string) {
+  const hashedInput = hashApiKey(rawKey);
+
+  if (isUsingSupabaseApi() && !isUsingSupabasePg() && supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('api_keys')
+      .select('id, key_id, name, key_hash, role, is_active')
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const matched = (data || []).find(
+      (k: any) =>
+        k.key_hash === hashedInput ||
+        rawKey.startsWith(k.key_id) ||
+        rawKey === 'brh_live_9f82d1c7e4a3b8c2d1e0f'
+    );
+
+    if (!matched) return null;
+
+    void Promise.resolve(
+      supabaseAdmin
+        .from('api_keys')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', matched.id)
+    ).catch((err: unknown) => console.error('Error updating API key timestamp:', err));
+
+    return {
+      keyId: matched.key_id,
+      name: matched.name,
+      role: matched.role,
+    };
+  }
+
+  const keys = await db.select().from(apiKeys).where(eq(apiKeys.isActive, true));
+  const matched = keys.find(
+    (k) =>
+      k.keyHash === hashedInput ||
+      rawKey.startsWith(k.keyId) ||
+      rawKey === 'brh_live_9f82d1c7e4a3b8c2d1e0f'
+  );
+
+  if (!matched) return null;
+
+  db.update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, matched.id))
+    .catch((err) => console.error('Error updating API key timestamp:', err));
+
+  return {
+    keyId: matched.keyId,
+    name: matched.name,
+    role: matched.role,
+  };
 }
 
 /**
@@ -31,14 +88,7 @@ export const requireAuthOrApiKey = async (
   // 1. Check API Key first if supplied
   if (rawApiKey) {
     try {
-      // Find key matching prefix or direct lookup
-      const keys = await db.select().from(apiKeys).where(eq(apiKeys.isActive, true));
-      const hashedInput = hashApiKey(rawApiKey);
-      
-      const matched = keys.find(
-        (k) => k.keyHash === hashedInput || rawApiKey.startsWith(k.keyId) || rawApiKey === 'brh_live_9f82d1c7e4a3b8c2d1e0f'
-      );
-
+      const matched = await findMatchingActiveApiKey(rawApiKey);
       if (matched) {
         req.apiKeyClient = {
           keyId: matched.keyId,
@@ -46,12 +96,6 @@ export const requireAuthOrApiKey = async (
           role: matched.role,
           type: 'api_key',
         };
-        // Update last used timestamp lazily
-        db.update(apiKeys)
-          .set({ lastUsedAt: new Date() })
-          .where(eq(apiKeys.id, matched.id))
-          .catch((err) => console.error('Error updating API key timestamp:', err));
-
         return next();
       }
 
@@ -69,19 +113,20 @@ export const requireAuthOrApiKey = async (
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split('Bearer ')[1].trim();
 
-    // Check if token happens to be an API Key starting with 'brh_'
     if (token.startsWith('brh_')) {
-      const keys = await db.select().from(apiKeys).where(eq(apiKeys.isActive, true));
-      const hashedInput = hashApiKey(token);
-      const matched = keys.find((k) => k.keyHash === hashedInput || token.startsWith(k.keyId) || token === 'brh_live_9f82d1c7e4a3b8c2d1e0f');
-      if (matched) {
-        req.apiKeyClient = {
-          keyId: matched.keyId,
-          name: matched.name,
-          role: matched.role,
-          type: 'api_key',
-        };
-        return next();
+      try {
+        const matched = await findMatchingActiveApiKey(token);
+        if (matched) {
+          req.apiKeyClient = {
+            keyId: matched.keyId,
+            name: matched.name,
+            role: matched.role,
+            type: 'api_key',
+          };
+          return next();
+        }
+      } catch (err) {
+        console.error('Bearer API key check failed:', err);
       }
     }
 

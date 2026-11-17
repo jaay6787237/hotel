@@ -1,11 +1,30 @@
-import { db } from './index.ts';
-import { rooms, roomCategories, promoCodes, reservations, payments, auditLogs, apiKeys, users } from './schema.ts';
+import { db, isUsingSupabasePg } from './index.ts';
+import { rooms, roomCategories, promoCodes, reservations, payments, auditLogs, apiKeys } from './schema.ts';
 import { eq, desc } from 'drizzle-orm';
 import crypto from 'crypto';
+import { supabaseAdmin, isUsingSupabaseApi } from '../lib/supabase-admin.ts';
 
-// 1. Ambil daftar kamar aktif dari PostgreSQL
+const shouldUseSupabaseRest = (): boolean => isUsingSupabaseApi() && !isUsingSupabasePg() && Boolean(supabaseAdmin);
+
+// 1. Ambil daftar kamar aktif dari PostgreSQL / Supabase
 export async function getRoomsFromDb() {
   try {
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.from('rooms').select('*');
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        id: r.id,
+        categoryId: r.category_id,
+        roomNumber: r.room_number,
+        name: r.name,
+        squareMeters: r.square_meters,
+        bedType: r.bed_type,
+        pricePerNight: String(r.price_per_night),
+        capacity: r.capacity,
+        status: r.status,
+        imageUrl: r.image_url,
+      }));
+    }
     return await db.select().from(rooms);
   } catch (error) {
     console.error('Database query failed in getRoomsFromDb:', error);
@@ -16,6 +35,21 @@ export async function getRoomsFromDb() {
 // 2. Ambil daftar promo code aktif
 export async function getPromoCodesFromDb() {
   try {
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('promo_codes')
+        .select('*')
+        .eq('is_active', true);
+      if (error) throw error;
+      return (data || []).map((p: any) => ({
+        code: p.code,
+        name: p.name,
+        discountPercent: p.discount_percent,
+        maxDiscount: String(p.max_discount),
+        isActive: p.is_active,
+        validUntil: p.valid_until,
+      }));
+    }
     return await db.select().from(promoCodes).where(eq(promoCodes.isActive, true));
   } catch (error) {
     console.error('Database query failed in getPromoCodesFromDb:', error);
@@ -23,7 +57,7 @@ export async function getPromoCodesFromDb() {
   }
 }
 
-// 3. Simpan transaksi reservasi baru secara aman (ACID) ke PostgreSQL
+// 3. Simpan transaksi reservasi baru secara aman (ACID) ke PostgreSQL / Supabase
 export interface NewReservationPayload {
   id: string; // 'BRH-XXXXXX'
   userUid?: string;
@@ -48,6 +82,58 @@ export interface NewReservationPayload {
 
 export async function createReservationInDb(payload: NewReservationPayload) {
   try {
+    const paymentId = `PAY-${payload.id.replace('BRH-', '')}`;
+    const refNumber = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { error: resError } = await supabaseAdmin.from('reservations').insert({
+        id: payload.id,
+        user_uid: payload.userUid || null,
+        room_id: payload.roomId,
+        promo_code: payload.promoCode || null,
+        guest_name: payload.guestName,
+        guest_email: payload.guestEmail,
+        guest_phone: payload.guestPhone,
+        guest_city: payload.guestCity || null,
+        check_in: payload.checkIn,
+        check_out: payload.checkOut,
+        nights: payload.nights,
+        guest_count: payload.guestCount,
+        special_requests: payload.specialRequests || null,
+        subtotal: payload.subtotal,
+        discount: payload.discount,
+        service_fee: payload.serviceFee,
+        tax: payload.tax,
+        total: payload.total,
+        status: 'Dikonfirmasi',
+      });
+      if (resError) throw resError;
+
+      const { error: payError } = await supabaseAdmin.from('payments').insert({
+        id: paymentId,
+        reservation_id: payload.id,
+        payment_method: payload.paymentMethod,
+        amount: payload.total,
+        status: 'Lunas',
+        reference_number: refNumber,
+      });
+      if (payError) throw payError;
+
+      await supabaseAdmin.from('audit_logs').insert({
+        reservation_id: payload.id,
+        old_status: 'Baru',
+        new_status: 'Dikonfirmasi',
+        note: `Reservasi berhasil dibuat atas nama ${payload.guestName} via ${payload.paymentMethod}`,
+      });
+
+      return {
+        success: true,
+        reservationId: payload.id,
+        paymentId,
+        referenceNumber: refNumber,
+      };
+    }
+
     // 1. Simpan Reservasi
     await db.insert(reservations).values({
       id: payload.id,
@@ -72,9 +158,6 @@ export async function createReservationInDb(payload: NewReservationPayload) {
     });
 
     // 2. Simpan Bukti Pembayaran
-    const paymentId = `PAY-${payload.id.replace('BRH-', '')}`;
-    const refNumber = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
     await db.insert(payments).values({
       id: paymentId,
       reservationId: payload.id,
@@ -107,6 +190,35 @@ export async function createReservationInDb(payload: NewReservationPayload) {
 // 4. Laporan Riwayat Reservasi (Multi-Join)
 export async function getReservationsReport() {
   try {
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('v_laporan_reservasi_lengkap')
+        .select('*');
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        id: row.kode_booking,
+        guestName: row.nama_tamu,
+        guestEmail: row.guest_email,
+        guestPhone: row.guest_phone,
+        checkIn: row.check_in,
+        checkOut: row.check_out,
+        nights: row.jumlah_malam,
+        roomName: row.nama_suite,
+        roomNumber: row.nomor_kamar,
+        category: row.kategori,
+        subtotal: String(row.subtotal),
+        discount: String(row.discount),
+        serviceFee: String(row.service_fee),
+        tax: String(row.tax),
+        total: String(row.total),
+        status: row.status_reservasi,
+        promoCode: row.promo_digunakan,
+        paymentMethod: row.payment_method,
+        paymentStatus: row.status_pembayaran,
+        createdAt: row.created_at,
+      }));
+    }
+
     return await db
       .select({
         id: reservations.id,
@@ -145,6 +257,24 @@ export async function getReservationsReport() {
 // 5. Manajemen Kunci Keamanan API (API Keys)
 export async function getApiKeysFromDb() {
   try {
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('api_keys')
+        .select('id, key_id, name, prefix, role, is_active, created_at, last_used_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map((k: any) => ({
+        id: k.id,
+        keyId: k.key_id,
+        name: k.name,
+        prefix: k.prefix,
+        role: k.role,
+        isActive: k.is_active,
+        createdAt: k.created_at,
+        lastUsedAt: k.last_used_at,
+      }));
+    }
+
     return await db
       .select({
         id: apiKeys.id,
@@ -173,6 +303,26 @@ export async function generateNewApiKey(name: string, role: 'read_only' | 'read_
     const keyId = `brh_live_${rawRandom.substring(0, 11)}`;
     const prefix = `brh_live_${rawRandom.substring(0, 6)}...`;
     const keyHash = crypto.createHash('sha256').update(fullApiKey).digest('hex');
+
+    if (shouldUseSupabaseRest() && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from('api_keys')
+        .insert({
+          key_id: keyId,
+          name,
+          key_hash: keyHash,
+          prefix,
+          role,
+          is_active: true,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return {
+        apiKey: fullApiKey,
+        keyDetails: data,
+      };
+    }
 
     const [created] = await db
       .insert(apiKeys)

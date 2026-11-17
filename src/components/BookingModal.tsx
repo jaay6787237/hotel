@@ -79,7 +79,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     setConfirmedBookingRef(refCode);
     setStep(3);
 
-    // Persist directly to Cloud SQL PostgreSQL via backend Express endpoint
+    // Persist to backend API (Supabase on Vercel or Cloud SQL on AI Studio)
     fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,7 +103,43 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         total: breakdown.totalAmount.toString(),
         paymentMethod: 'Transfer Virtual Account (BCA/Mandiri)',
       }),
-    }).catch((err) => console.error('Gagal sinkronisasi ke database Cloud SQL:', err));
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      })
+      .catch(async (err) => {
+        // Fallback direct Supabase insert if deployed as static frontend without API route
+        const { supabase } = await import('../lib/supabase');
+        if (supabase) {
+          const { error: sbError } = await supabase.from('reservations').insert({
+            id: refCode,
+            room_id: room.id,
+            promo_code: promoInput || null,
+            guest_name: guestDetails.fullName || 'Tamu Terhormat',
+            guest_email: guestDetails.email,
+            guest_phone: guestDetails.phone,
+            guest_city: 'Bandar Lampung',
+            check_in: dates.checkIn,
+            check_out: dates.checkOut,
+            nights: breakdown.nights,
+            guest_count: 2,
+            special_requests: guestDetails.specialRequests || null,
+            subtotal: breakdown.subtotal.toString(),
+            discount: breakdown.discountAmount.toString(),
+            service_fee: breakdown.serviceChargeAmount.toString(),
+            tax: breakdown.taxAmount.toString(),
+            total: breakdown.totalAmount.toString(),
+            status: 'Dikonfirmasi',
+          });
+          if (sbError) {
+            console.error('Gagal sinkronisasi ke Supabase:', sbError);
+          }
+        } else {
+          console.error('Gagal sinkronisasi ke database PostgreSQL:', err);
+        }
+      });
   };
 
   const handleCopyBookingRef = (ref: string) => {
