@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { requireAuthOrApiKey, AuthenticatedRequest } from '../src/middleware/auth.ts';
+import { requireAuthOrApiKey, type AuthenticatedRequest } from '../src/middleware/auth.ts';
 import { isUsingSupabasePg } from '../src/db/index.ts';
 import { isUsingSupabaseApi } from '../src/lib/supabase-admin.ts';
 import {

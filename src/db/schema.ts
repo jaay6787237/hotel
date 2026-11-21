@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { boolean, decimal, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, date, decimal, integer, numeric, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 // 1. Users Table (Integrated with Firebase Authentication)
 export const users = pgTable('users', {
@@ -106,6 +106,100 @@ export const auditLogs = pgTable('audit_logs', {
   newStatus: text('new_status').notNull(),
   changedAt: timestamp('changed_at').defaultNow().notNull(),
   note: text('note'),
+});
+
+// ---------------------------------------------------------------------
+// PHP OOP MVC Relational Tables (Supabase / Cloud SQL PostgreSQL)
+// ---------------------------------------------------------------------
+
+export const kategoriKamar = pgTable('kategori_kamar', {
+  idKategori: serial('id_kategori').primaryKey(),
+  kodeKategori: varchar('kode_kategori', { length: 20 }).notNull().unique(),
+  namaKategori: varchar('nama_kategori', { length: 100 }).notNull(),
+  deskripsi: text('deskripsi'),
+  kapasitasMaks: integer('kapasitas_maks').notNull().default(2),
+  tipePemandangan: varchar('tipe_pemandangan', { length: 100 }).notNull().default('Pemandangan Bukit & Teluk'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const kamar = pgTable('kamar', {
+  idKamar: serial('id_kamar').primaryKey(),
+  kodeKamar: varchar('kode_kamar', { length: 20 }).notNull().unique(),
+  idKategori: integer('id_kategori').notNull().references(() => kategoriKamar.idKategori),
+  nomorKamar: varchar('nomor_kamar', { length: 10 }).notNull().unique(),
+  namaKamar: varchar('nama_kamar', { length: 150 }).notNull(),
+  tagline: text('tagline'),
+  deskripsi: text('deskripsi'),
+  tarifPerMalam: numeric('tarif_per_malam', { precision: 12, scale: 2 }).notNull(),
+  kapasitasTamu: integer('kapasitas_tamu').notNull().default(2),
+  luasM2: integer('luas_m2').notNull().default(45),
+  tipeKasur: varchar('tipe_kasur', { length: 80 }).notNull().default('King Bed'),
+  pemandangan: varchar('pemandangan', { length: 120 }).notNull().default('Bukit & Teluk Lampung'),
+  fasilitas: text('fasilitas').notNull().default('[]'),
+  urlGambar: varchar('url_gambar', { length: 255 }).notNull().default('/assets/images/suite_presidential_1794410440213.jpg'),
+  isFeatured: boolean('is_featured').notNull().default(false),
+  statusKetersediaan: varchar('status_ketersediaan', { length: 30 }).notNull().default('Tersedia'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const tamu = pgTable('tamu', {
+  idTamu: serial('id_tamu').primaryKey(),
+  namaLengkap: varchar('nama_lengkap', { length: 150 }).notNull(),
+  email: varchar('email', { length: 150 }).notNull().unique(),
+  noTelepon: varchar('no_telepon', { length: 40 }).notNull(),
+  kotaAsal: varchar('kota_asal', { length: 100 }).default('Bandar Lampung'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const voucherPromo = pgTable('voucher_promo', {
+  idVoucher: serial('id_voucher').primaryKey(),
+  kodePromo: varchar('kode_promo', { length: 40 }).notNull().unique(),
+  namaPromo: varchar('nama_promo', { length: 150 }).notNull(),
+  persenDiskon: integer('persen_diskon').notNull(),
+  maksDiskon: numeric('maks_diskon', { precision: 12, scale: 2 }).notNull().default('1000000.00'),
+  berlakuHingga: date('berlaku_hingga').notNull().default('2026-12-31'),
+  isActive: boolean('is_active').notNull().default(true),
+});
+
+export const reservasi = pgTable('reservasi', {
+  idReservasi: serial('id_reservasi').primaryKey(),
+  kodeBooking: varchar('kode_booking', { length: 30 }).notNull().unique(),
+  idTamu: integer('id_tamu').notNull().references(() => tamu.idTamu),
+  idKamar: integer('id_kamar').notNull().references(() => kamar.idKamar),
+  idVoucher: integer('id_voucher').references(() => voucherPromo.idVoucher),
+  tglCheckin: date('tgl_checkin').notNull(),
+  tglCheckout: date('tgl_checkout').notNull(),
+  jumlahMalam: integer('jumlah_malam').notNull(),
+  jumlahTamu: integer('jumlah_tamu').notNull().default(2),
+  catatanKhusus: text('catatan_khusus'),
+  subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
+  potonganDiskon: numeric('potongan_diskon', { precision: 12, scale: 2 }).notNull().default('0.00'),
+  biayaLayanan: numeric('biaya_layanan', { precision: 12, scale: 2 }).notNull(),
+  pajakPpn: numeric('pajak_ppn', { precision: 12, scale: 2 }).notNull(),
+  totalTagihan: numeric('total_tagihan', { precision: 12, scale: 2 }).notNull(),
+  statusReservasi: varchar('status_reservasi', { length: 30 }).notNull().default('Dikonfirmasi'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const pembayaran = pgTable('pembayaran', {
+  idPembayaran: serial('id_pembayaran').primaryKey(),
+  idReservasi: integer('id_reservasi').notNull().references(() => reservasi.idReservasi),
+  metodePembayaran: varchar('metode_pembayaran', { length: 100 }).notNull().default('Transfer Virtual Account (BCA/Mandiri)'),
+  jumlahBayar: numeric('jumlah_bayar', { precision: 12, scale: 2 }).notNull(),
+  statusPembayaran: varchar('status_pembayaran', { length: 30 }).notNull().default('Lunas'),
+  nomorReferensi: varchar('nomor_referensi', { length: 80 }).notNull().unique(),
+  tglBayar: timestamp('tgl_bayar').defaultNow().notNull(),
+});
+
+export const logAuditReservasi = pgTable('log_audit_reservasi', {
+  idLog: serial('id_log').primaryKey(),
+  idReservasi: integer('id_reservasi').notNull(),
+  kodeBooking: varchar('kode_booking', { length: 30 }),
+  statusLama: varchar('status_lama', { length: 30 }),
+  statusBaru: varchar('status_baru', { length: 30 }).notNull(),
+  keterangan: text('keterangan'),
+  waktuPerubahan: timestamp('waktu_perubahan').defaultNow().notNull(),
 });
 
 // Relationships
