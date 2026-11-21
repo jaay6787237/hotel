@@ -1,5 +1,5 @@
 import type { FlashMessage } from '../auth.ts';
-import { escapeHtml, safeJson } from './helpers.ts';
+import { escapeHtml } from './helpers.ts';
 
 export interface LoginViewProps {
   flash: FlashMessage | null;
@@ -8,32 +8,13 @@ export interface LoginViewProps {
 }
 
 export function renderLoginPage(props: LoginViewProps): string {
-  const { flash, defaultAdminUser, isDefaultPassword } = props;
+  const { flash, defaultAdminUser } = props;
   const flashHtml = flash
     ? `<div role="alert" class="p-3.5 rounded-lg border text-xs font-medium ${
         flash.type === 'error'
           ? 'bg-red-50 border-red-200 text-red-700'
           : 'bg-emerald-50 border-emerald-200 text-[#007A33]'
       }">${escapeHtml(flash.message)}</div>`
-    : '';
-
-  const demoBoxHtml = isDefaultPassword
-    ? `<div class="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-semibold text-[#005A2B]">Akun Default Front Office</span>
-          <button
-            type="button"
-            id="fill-demo-btn"
-            class="px-2.5 py-1 bg-white border border-emerald-300 text-[#007A33] hover:bg-emerald-50 rounded text-[11px] font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0"
-          >
-            Isi Kredensial
-          </button>
-        </div>
-        <div class="grid grid-cols-1 gap-1 text-[11px] text-slate-700 font-mono">
-          <div>Email: <strong class="text-slate-900 select-all">${escapeHtml(defaultAdminUser)}</strong></div>
-          <div>Sandi: <strong class="text-slate-900 select-all">BukitRandu2026!</strong></div>
-        </div>
-      </div>`
     : '';
 
   return `<!doctype html>
@@ -161,12 +142,6 @@ export function renderLoginPage(props: LoginViewProps): string {
         </button>
       </form>
 
-      ${demoBoxHtml}
-
-      <div class="p-3 bg-[#F8FAFC] border border-slate-200 rounded-lg text-[11px] text-slate-600">
-        Sesi dilindungi tanda tangan kriptografi HMAC SHA-256 pada HTTP-Only Cookie.
-      </div>
-
       <div class="text-center pt-1">
         <a href="/" class="btn-press inline-block px-3 py-1.5 rounded text-xs font-semibold text-[#007A33] hover:bg-emerald-50 transition-colors">&larr; Kembali ke Halaman Utama Tamu</a>
       </div>
@@ -179,8 +154,6 @@ export function renderLoginPage(props: LoginViewProps): string {
       const toggleBtn = document.getElementById('toggle-password-btn');
       const eyeShow = document.getElementById('eye-icon-show');
       const eyeHide = document.getElementById('eye-icon-hide');
-      const fillBtn = document.getElementById('fill-demo-btn');
-      const usernameInput = document.getElementById('username');
       const loginForm = document.getElementById('admin-login-form');
       const submitBtn = document.getElementById('login-submit-btn');
 
@@ -204,25 +177,6 @@ export function renderLoginPage(props: LoginViewProps): string {
           toggleBtn.setAttribute('aria-label', isHidden ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
           if (eyeShow) eyeShow.classList.toggle('hidden', isHidden);
           if (eyeHide) eyeHide.classList.toggle('hidden', !isHidden);
-        });
-      }
-
-      if (fillBtn && usernameInput && passwordInput) {
-        fillBtn.addEventListener('click', function () {
-          usernameInput.value = ${safeJson(defaultAdminUser)};
-          passwordInput.value = 'BukitRandu2026!';
-          usernameInput.classList.add('ring-2', 'ring-[#007A33]/35', 'bg-emerald-50/40');
-          passwordInput.classList.add('ring-2', 'ring-[#007A33]/35', 'bg-emerald-50/40');
-          const origText = fillBtn.textContent;
-          fillBtn.textContent = '✓ Terisi';
-          fillBtn.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
-          setTimeout(function () {
-            usernameInput.classList.remove('ring-2', 'ring-[#007A33]/35', 'bg-emerald-50/40');
-            passwordInput.classList.remove('ring-2', 'ring-[#007A33]/35', 'bg-emerald-50/40');
-            fillBtn.textContent = origText;
-            fillBtn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-600');
-          }, 1200);
-          passwordInput.focus();
         });
       }
 
