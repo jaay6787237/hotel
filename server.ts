@@ -499,7 +499,11 @@ app.use((_req: Request, res: Response) => {
     );
 });
 
-const PORT = Number(process.env.PORT || 3000);
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Bukit Randu Hospitality server listening on http://0.0.0.0:${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  const PORT = Number(process.env.PORT || 3000);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Bukit Randu Hospitality server listening on http://0.0.0.0:${PORT}`);
+  });
+}
