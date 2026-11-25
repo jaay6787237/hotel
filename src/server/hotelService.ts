@@ -3,6 +3,7 @@ import { pool } from './db.ts';
 import {
   calculateReservationPricing,
   generateBookingCode,
+  isRoomBookableStatus,
   isValidStayRange,
   resolveNextRoomStatus,
 } from './pricing.ts';
@@ -53,6 +54,7 @@ export interface RoomRow {
   url_gambar: string;
   is_featured: boolean;
   status_ketersediaan: string;
+  is_bookable?: boolean;
   kode_kategori: string;
   nama_kategori: string;
   tipe_pemandangan?: string;
@@ -203,7 +205,8 @@ function normalizeReservationRow(row: Record<string, unknown>): ReservationRepor
     metode_pembayaran: String(row.metode_pembayaran ?? 'Bayar di Resepsionis'),
     status_pembayaran: String(row.status_pembayaran ?? 'Belum Lunas'),
     nomor_referensi: String(row.nomor_referensi ?? '-'),
-    created_at: String(row.created_at ?? ''),
+    created_at:
+      row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at ?? ''),
   };
 }
 
@@ -269,7 +272,32 @@ export async function getRoomsWithCategory(): Promise<RoomRow[]> {
     kapasitas_tamu: Number(row.kapasitas_tamu ?? 2),
     luas_m2: Number(row.luas_m2 ?? 45),
     is_featured: Boolean(row.is_featured),
+    is_bookable: isRoomBookableStatus(String(row.status_ketersediaan ?? 'Tersedia')),
     fasilitas_array: parseFacilities(row.fasilitas),
+  }));
+}
+
+export async function getRoomsWithAvailability(
+  tglCheckin?: string,
+  tglCheckout?: string
+): Promise<RoomRow[]> {
+  const rooms = await getRoomsWithCategory();
+  if (!tglCheckin || !tglCheckout || !isValidStayRange(tglCheckin, tglCheckout)) {
+    return rooms;
+  }
+
+  const conflictRes = await pool.query<{ id_kamar: number }>(
+    `SELECT DISTINCT id_kamar
+     FROM public.reservasi
+     WHERE status_reservasi NOT IN ('Batal', 'Selesai')
+       AND (tgl_checkin < $2::date AND tgl_checkout > $1::date)`,
+    [tglCheckin, tglCheckout]
+  );
+  const busyRoomIds = new Set(conflictRes.rows.map((r) => Number(r.id_kamar)));
+
+  return rooms.map((room) => ({
+    ...room,
+    is_bookable: isRoomBookableStatus(room.status_ketersediaan) && !busyRoomIds.has(room.id_kamar),
   }));
 }
 
@@ -339,6 +367,16 @@ export async function cekKetersediaanKamar(
   if (!isValidStayRange(tglCheckin, tglCheckout)) {
     return false;
   }
+
+  const kRes = await pool.query<{ status_ketersediaan: string }>(
+    'SELECT status_ketersediaan FROM public.kamar WHERE id_kamar = $1',
+    [idKamar]
+  );
+  const statusKamar = kRes.rows[0]?.status_ketersediaan;
+  if (!statusKamar || !isRoomBookableStatus(statusKamar)) {
+    return false;
+  }
+
   try {
     const res = await pool.query<{ tersedia: boolean }>(
       'SELECT public.sf_cek_ketersediaan_kamar($1, $2::date, $3::date) AS tersedia',
@@ -348,14 +386,6 @@ export async function cekKetersediaanKamar(
   } catch (err) {
     if (getPgCode(err) !== '42883') {
       throw err;
-    }
-    const kRes = await pool.query<{ status_ketersediaan: string }>(
-      'SELECT status_ketersediaan FROM public.kamar WHERE id_kamar = $1',
-      [idKamar]
-    );
-    const statusKamar = kRes.rows[0]?.status_ketersediaan;
-    if (!statusKamar || statusKamar === 'Pemeliharaan') {
-      return false;
     }
     const bRes = await pool.query<{ cnt: string }>(
       `SELECT COUNT(*)::text AS cnt FROM public.reservasi
@@ -479,6 +509,24 @@ export async function getAuditLogs(limit = 20): Promise<AuditLogRow[]> {
   }));
 }
 
+export async function getAdminSyncSnapshot() {
+  const [kpi, reservations, rooms, subqueryAnalytics, auditLogs] = await Promise.all([
+    getKpiMetrics(),
+    getLaporanMultiJoin(),
+    getRoomsWithCategory(),
+    getAnalitikSubquery(),
+    getAuditLogs(20),
+  ]);
+  return {
+    kpi,
+    reservations,
+    rooms,
+    subqueryAnalytics,
+    auditLogs,
+    serverTime: new Date().toISOString(),
+  };
+}
+
 async function hasTrigger(client: PoolClient, triggerName: string): Promise<boolean> {
   const trigRes = await client.query<{ has_trg: boolean }>(
     'SELECT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = $1) AS has_trg',
@@ -536,10 +584,18 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
     throw new Error('Kamar yang dipilih tidak ditemukan.');
   }
 
+  if (!isRoomBookableStatus(kamar.status_ketersediaan)) {
+    throw new KamarPenuhException(
+      kamar.status_ketersediaan === 'Terisi'
+        ? `Kamar ${kamar.nomor_kamar} (${kamar.nama_kamar}) saat ini berstatus Terisi sehingga tidak dapat dipesan.`
+        : `Kamar ${kamar.nomor_kamar} (${kamar.nama_kamar}) sedang dalam Pemeliharaan sehingga tidak dapat dipesan.`
+    );
+  }
+
   const tersedia = await cekKetersediaanKamar(idKamar, tglCheckin, tglCheckout);
   if (!tersedia) {
     throw new KamarPenuhException(
-      `Kamar ${kamar.nomor_kamar} (${kamar.nama_kamar}) sedang terisi atau dalam pemeliharaan pada tanggal tersebut.`
+      `Kamar ${kamar.nomor_kamar} (${kamar.nama_kamar}) sudah dipesan pada rentang tanggal ${tglCheckin} s/d ${tglCheckout}.`
     );
   }
 
@@ -676,14 +732,24 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
     ...pricing,
     nama_kamar: kamar.nama_kamar,
     nomor_kamar: kamar.nomor_kamar,
+    kode_kamar: kamar.kode_kamar,
+    nama_kategori: kamar.nama_kategori,
+    kode_promo: kodePromo || '-',
+    persen_diskon: persenDiskon,
     tgl_checkin: tglCheckin,
     tgl_checkout: tglCheckout,
     jumlah_malam: jumlahMalam,
+    jumlah_tamu: jumlahTamu,
     nama_tamu: namaTamu,
     email_tamu: emailTamu,
     telepon_tamu: noTelepon,
+    kota_asal: kotaAsal,
+    catatan_khusus: catatan || null,
     metode_pembayaran: metodeBayar,
     status_pembayaran: 'Lunas',
+    status_reservasi: 'Dikonfirmasi',
+    nomor_referensi: `PAY-${kodeBooking}`,
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -853,6 +919,18 @@ export async function batalkanReservasi(idReservasi: number): Promise<void> {
 }
 
 export async function createRoom(data: Record<string, unknown>): Promise<number> {
+  const kodeKamar = String(data.kode_kamar ?? '').trim().toUpperCase();
+  const nomorKamar = String(data.nomor_kamar ?? '').trim();
+  const namaKamar = String(data.nama_kamar ?? '').trim();
+  const tarifPerMalam = Number(data.tarif_per_malam ?? 1850000);
+
+  if (!kodeKamar || !nomorKamar || !namaKamar) {
+    throw new InvalidInputError('Kode kamar, nomor kamar, dan nama kamar wajib diisi.');
+  }
+  if (!Number.isFinite(tarifPerMalam) || tarifPerMalam <= 0) {
+    throw new InvalidInputError('Tarif per malam harus lebih besar dari 0.');
+  }
+
   const statusRaw = String(data.status_ketersediaan ?? 'Tersedia');
   const status = ['Tersedia', 'Terisi', 'Pemeliharaan'].includes(statusRaw) ? statusRaw : 'Tersedia';
   const fasilitas = JSON.stringify(['Wi-Fi Cepat', 'Sarapan Prasmanan', 'Balkon Panorama']);
@@ -868,18 +946,18 @@ export async function createRoom(data: Record<string, unknown>): Promise<number>
        $12, $13, $14, $15
      ) RETURNING id_kamar`,
     [
-      String(data.kode_kamar ?? '').trim().toUpperCase(),
+      kodeKamar,
       Number(data.id_kategori ?? 1),
-      String(data.nomor_kamar ?? '').trim(),
-      String(data.nama_kamar ?? '').trim(),
+      nomorKamar,
+      namaKamar,
       String(data.tagline ?? 'Kamar panorama eksklusif di puncak Bukit Randu').trim(),
       String(
         data.deskripsi ??
           'Nikmati kenyamanan suite modern dengan pemandangan Bukit Randu dan Teluk Lampung.'
       ).trim(),
-      Number(data.tarif_per_malam ?? 1850000),
-      Number(data.kapasitas_tamu ?? 2),
-      Number(data.luas_m2 ?? 65),
+      tarifPerMalam,
+      Math.max(1, Number(data.kapasitas_tamu ?? 2) || 2),
+      Math.max(10, Number(data.luas_m2 ?? 65) || 65),
       String(data.tipe_kasur ?? 'King Bed').trim(),
       String(data.pemandangan ?? 'Bukit & Teluk Lampung').trim(),
       fasilitas,
@@ -892,15 +970,27 @@ export async function createRoom(data: Record<string, unknown>): Promise<number>
 }
 
 export async function updateRoomStatus(idKamar: number, status: string): Promise<void> {
+  if (!Number.isInteger(idKamar) || idKamar <= 0) {
+    throw new InvalidInputError('ID kamar tidak valid.');
+  }
   if (!['Tersedia', 'Terisi', 'Pemeliharaan'].includes(status)) {
     throw new InvalidInputError('Status kamar tidak valid.');
   }
-  await pool.query('UPDATE public.kamar SET status_ketersediaan = $1 WHERE id_kamar = $2', [
+  const res = await pool.query('UPDATE public.kamar SET status_ketersediaan = $1 WHERE id_kamar = $2', [
     status,
     idKamar,
   ]);
+  if (res.rowCount === 0) {
+    throw new InvalidInputError(`Unit kamar #${idKamar} tidak ditemukan.`);
+  }
 }
 
 export async function deleteRoom(idKamar: number): Promise<void> {
-  await pool.query('DELETE FROM public.kamar WHERE id_kamar = $1', [idKamar]);
+  if (!Number.isInteger(idKamar) || idKamar <= 0) {
+    throw new InvalidInputError('ID kamar tidak valid.');
+  }
+  const res = await pool.query('DELETE FROM public.kamar WHERE id_kamar = $1', [idKamar]);
+  if (res.rowCount === 0) {
+    throw new InvalidInputError(`Unit kamar #${idKamar} tidak ditemukan.`);
+  }
 }

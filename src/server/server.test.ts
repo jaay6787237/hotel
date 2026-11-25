@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -7,12 +9,17 @@ import {
   verifyAdminCredentials,
   verifySignedToken,
 } from './auth.ts';
+import { hasDatabaseConfig } from './db.ts';
 import {
   calculateReservationPricing,
   generateBookingCode,
+  isRoomBookableStatus,
   isValidStayRange,
   resolveNextRoomStatus,
 } from './pricing.ts';
+import { renderRdbmsArchitectureSection } from './views/rdbmsSection.ts';
+import { renderLandingPage } from './views/landing.ts';
+import { renderDashboardPage } from './views/dashboard.ts';
 
 test('verifyAdminCredentials accepts default credentials case-insensitively and rejects wrong passwords', () => {
   assert.equal(verifyAdminCredentials('admin@bukitrandu.com', 'BukitRandu2026!'), true);
@@ -95,19 +102,130 @@ test('isValidStayRange enforces checkout strictly after checkin', () => {
 });
 
 test('resolveNextRoomStatus keeps room Tersedia on Dikonfirmasi and updates only on Check-In / Selesai / Check-In Cancel', () => {
-  // Booking Dikonfirmasi -> kamar tetap Tersedia
   assert.equal(resolveNextRoomStatus(null, 'Dikonfirmasi', 'Tersedia'), 'Tersedia');
-  // Tamu Check-In -> kamar Terisi
   assert.equal(resolveNextRoomStatus('Dikonfirmasi', 'Check-In', 'Tersedia'), 'Terisi');
-  // Tamu Check-Out (Selesai) -> kamar Pemeliharaan
   assert.equal(resolveNextRoomStatus('Check-In', 'Selesai', 'Terisi'), 'Pemeliharaan');
-  // Batal setelah Check-In -> kamar kembali Tersedia
   assert.equal(resolveNextRoomStatus('Check-In', 'Batal', 'Terisi'), 'Tersedia');
-  // Batal sebelum Check-In -> kamar tetap status semula
   assert.equal(resolveNextRoomStatus('Dikonfirmasi', 'Batal', 'Tersedia'), 'Tersedia');
 });
 
 test('generateBookingCode returns BRH-XXXXXX format', () => {
   const code = generateBookingCode();
   assert.match(code, /^BRH-[A-Z2-9]{6}$/);
+});
+
+test('isRoomBookableStatus allows only Tersedia and blocks Terisi and Pemeliharaan', () => {
+  assert.equal(isRoomBookableStatus('Tersedia'), true);
+  assert.equal(isRoomBookableStatus('Terisi'), false);
+  assert.equal(isRoomBookableStatus('Pemeliharaan'), false);
+  assert.equal(isRoomBookableStatus(''), false);
+});
+
+test('renderRdbmsArchitectureSection renders SF, SP, Trigger, Multi-Join View, Subquery, and 7-table schema explanations', () => {
+  const html = renderRdbmsArchitectureSection();
+  for (const needle of [
+    'id="arsitektur-db"',
+    'sf_hitung_total_tagihan',
+    'sf_cek_ketersediaan_kamar',
+    'sp_buat_reservasi_baru',
+    'sp_proses_check_out',
+    'trg_update_ketersediaan_kamar',
+    'trg_log_perubahan_reservasi',
+    'vw_laporan_reservasi_lengkap',
+    'Scalar Subquery',
+    'log_audit_reservasi',
+    'data-trg-sim="checkin"',
+    'data-sql-tab="multijoin"',
+  ]) {
+    assert.ok(html.includes(needle), `Missing expected RDBMS section token: ${needle}`);
+  }
+});
+
+test('hasDatabaseConfig supports DATABASE_URL and ignores placeholder DB_HOST values', () => {
+  const keys = [
+    'DATABASE_URL',
+    'POSTGRES_URL',
+    'POSTGRES_PRISMA_URL',
+    'POSTGRES_URL_NON_POOLING',
+    'SUPABASE_DB_URL',
+    'DB_HOST',
+    'POSTGRES_HOST',
+    'SQL_HOST',
+  ] as const;
+  const backup = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+
+  try {
+    for (const k of keys) delete process.env[k];
+    assert.equal(hasDatabaseConfig(), false);
+
+    process.env.DB_HOST = 'aws-0-ap-southeast-1.pooler.supabase.com';
+    process.env.DATABASE_URL = 'postgresql://postgres.your-project-id:pw@host:6543/postgres';
+    // DATABASE_URL has placeholder so it is skipped, valid DB_HOST still makes config true
+    assert.equal(hasDatabaseConfig(), true);
+
+    delete process.env.DB_HOST;
+    assert.equal(hasDatabaseConfig(), false);
+
+    process.env.DATABASE_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
+    assert.equal(hasDatabaseConfig(), true);
+  } finally {
+    for (const k of keys) {
+      if (backup[k] === undefined) delete process.env[k];
+      else process.env[k] = backup[k];
+    }
+  }
+});
+
+test('vercel.json rewrites dynamic traffic to /api/index while letting static public assets bypass', () => {
+  const raw = readFileSync(path.resolve('vercel.json'), 'utf8');
+  const cfg = JSON.parse(raw) as {
+    outputDirectory?: string;
+    functions?: Record<string, { includeFiles?: string }>;
+    rewrites?: Array<{ source: string; destination: string }>;
+  };
+  assert.equal(cfg.outputDirectory, 'public');
+  assert.equal(cfg.functions?.['api/index.ts']?.includeFiles, '{src/server/**,public/**}');
+  assert.equal(cfg.rewrites?.[0]?.destination, '/api/index');
+  assert.ok(cfg.rewrites?.[0]?.source.includes('assets/'));
+});
+
+test('SSR landing and dashboard pages render critical sync and receipt markup without window.alert or window.open', () => {
+  const landingHtml = renderLandingPage({
+    rooms: [],
+    promos: [],
+    kwitansi: null,
+    cekKodeError: null,
+    searchedCode: '',
+    dbError: null,
+    flash: null,
+    defaultCheckIn: '2026-12-01',
+    defaultCheckOut: '2026-12-03',
+  });
+  const errIdx = landingHtml.indexOf('id="bm-error-box"');
+  const step1Idx = landingHtml.indexOf('id="booking-step-1"');
+  assert.ok(errIdx > 0 && step1Idx > 0 && errIdx < step1Idx, 'bm-error-box must precede booking-step-1');
+  assert.ok(landingHtml.includes('id="printable-voucher"'));
+  assert.equal(/\bwindow\.(alert|open)\s*\(/.test(landingHtml), false);
+
+  const dashboardHtml = renderDashboardPage({
+    adminIdentity: 'admin@bukitrandu.com',
+    kpi: {
+      total_kamar: 5,
+      kamar_terisi: 1,
+      kamar_tersedia: 4,
+      kamar_pemeliharaan: 0,
+      okupansi_persen: 20,
+      reservasi_aktif: 1,
+      pendapatan_lunas: 3000000,
+    },
+    reservations: [],
+    rooms: [],
+    categories: [],
+    subqueryAnalytics: { rata_rata_tarif: 2500000, kamar_premium: [] },
+    auditLogs: [],
+    flash: null,
+  });
+  assert.ok(dashboardHtml.includes('/api/admin/sync'));
+  assert.ok(dashboardHtml.includes('kamar_pemeliharaan'));
+  assert.equal(/\bwindow\.(alert|open)\s*\(/.test(dashboardHtml), false);
 });

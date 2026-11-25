@@ -287,6 +287,9 @@ export function renderDashboardPage(props: DashboardViewProps): string {
       </div>
 
       <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <a href="/#arsitektur-db" class="btn-press hidden md:inline-flex px-3.5 py-2 text-xs font-medium text-[#D4AF37] hover:text-white border border-[#D4AF37]/40 rounded-md transition-colors whitespace-nowrap shrink-0">
+          Penjelasan SQL
+        </a>
         <a href="/" class="btn-press px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-medium text-slate-200 hover:text-white border border-white/20 rounded-md transition-colors whitespace-nowrap shrink-0">
           <span class="hidden sm:inline">Lihat </span>Web Tamu
         </a>
@@ -314,25 +317,25 @@ export function renderDashboardPage(props: DashboardViewProps): string {
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div class="dash-enter dash-delay-1 bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Tingkat Okupansi Kamar</span>
-          <div class="text-3xl font-serif font-bold text-[#007A33] mt-2 tabular-nums">${escapeHtml(kpi.okupansi_persen)}%</div>
-          <p class="text-xs text-slate-500 mt-1">${kpi.kamar_terisi} dari ${kpi.total_kamar} unit berstatus Terisi</p>
+          <div id="kpi-okupansi" class="text-3xl font-serif font-bold text-[#007A33] mt-2 tabular-nums">${escapeHtml(kpi.okupansi_persen)}%</div>
+          <p id="kpi-okupansi-sub" class="text-xs text-slate-500 mt-1">${kpi.kamar_terisi} dari ${kpi.total_kamar} unit berstatus Terisi</p>
         </div>
 
         <div class="dash-enter dash-delay-2 bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Reservasi &amp; Check-In Aktif</span>
-          <div class="text-3xl font-serif font-bold text-[#0F1F17] mt-2 tabular-nums">${kpi.reservasi_aktif}</div>
+          <div id="kpi-aktif" class="text-3xl font-serif font-bold text-[#0F1F17] mt-2 tabular-nums">${kpi.reservasi_aktif}</div>
           <p class="text-xs text-slate-500 mt-1">Status Dikonfirmasi &amp; Check-In berjalan</p>
         </div>
 
         <div class="dash-enter dash-delay-3 bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Total Pendapatan Lunas</span>
-          <div class="text-2xl font-serif font-bold text-[#005A2B] mt-2 tabular-nums">${escapeHtml(formatRupiah(kpi.pendapatan_lunas))}</div>
+          <div id="kpi-pendapatan" class="text-2xl font-serif font-bold text-[#005A2B] mt-2 tabular-nums">${escapeHtml(formatRupiah(kpi.pendapatan_lunas))}</div>
           <p class="text-xs text-slate-500 mt-1">Akumulasi tabel pembayaran berstatus Lunas</p>
         </div>
 
         <div class="dash-enter dash-delay-4 bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Kamar Pemeliharaan</span>
-          <div class="text-3xl font-serif font-bold text-[#D4AF37] mt-2 tabular-nums">${kpi.kamar_pemeliharaan}</div>
+          <div id="kpi-pemeliharaan" class="text-3xl font-serif font-bold text-[#D4AF37] mt-2 tabular-nums">${kpi.kamar_pemeliharaan}</div>
           <p class="text-xs text-slate-500 mt-1">Menunggu pembersihan housekeeping pasca Check-Out</p>
         </div>
       </div>
@@ -456,7 +459,7 @@ export function renderDashboardPage(props: DashboardViewProps): string {
                 <th class="px-4 py-3 font-semibold text-right">Hapus</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody id="rooms-tbody" class="divide-y divide-slate-100">
               ${roomRowsHtml}
             </tbody>
           </table>
@@ -469,10 +472,10 @@ export function renderDashboardPage(props: DashboardViewProps): string {
         <span class="text-[11px] font-semibold uppercase tracking-wider text-[#007A33] block">Scalar Subquery PostgreSQL</span>
         <h2 class="text-xl font-serif font-bold text-[#0F1F17] mt-0.5">Kamar di Atas Rata-Rata Tarif Hotel</h2>
         <p class="text-xs text-slate-600 mt-1 mb-4">
-          Rata-rata tarif seluruh properti saat ini: <strong class="text-[#007A33] font-serif text-sm">${escapeHtml(formatRupiah(subqueryAnalytics.rata_rata_tarif))}</strong> / malam
+          Rata-rata tarif seluruh properti saat ini: <strong id="subquery-rata" class="text-[#007A33] font-serif text-sm">${escapeHtml(formatRupiah(subqueryAnalytics.rata_rata_tarif))}</strong> / malam
         </p>
 
-        <div class="space-y-2.5">
+        <div id="subquery-list" class="space-y-2.5">
           ${premiumRoomsHtml}
         </div>
       </div>
@@ -481,23 +484,50 @@ export function renderDashboardPage(props: DashboardViewProps): string {
         <span class="text-[11px] font-semibold uppercase tracking-wider text-[#D4AF37] block">Trigger Otomatis: log_audit_reservasi</span>
         <h2 class="text-xl font-serif font-bold text-[#0F1F17] mt-0.5 mb-4">Feed Riwayat Audit Reservasi</h2>
 
-        <div class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+        <div id="audit-logs-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
           ${auditLogsHtml}
         </div>
       </div>
     </section>
   </main>
 
+  <div id="dash-toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
   <script>
     (function () {
       const searchInput = document.getElementById('reservation-search');
       const filterBtns = Array.from(document.querySelectorAll('.res-filter-btn'));
-      const rows = Array.from(document.querySelectorAll('.reservation-row'));
-      const emptyRow = document.getElementById('reservations-empty-filter');
       let activeStatus = 'Semua';
+      let lastSyncSig = '';
+      let syncSeq = 0;
+      const dirtyRoomIds = new Set();
+
+      const escHtml = (val) =>
+        String(val ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+
+      const fmtRupiah = (amount) => 'IDR ' + Math.round(Number(amount) || 0).toLocaleString('id-ID');
+
+      const showDashToast = (title, desc) => {
+        const container = document.getElementById('dash-toast-container');
+        if (!container) return;
+        const el = document.createElement('div');
+        el.className = 'pointer-events-auto bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 text-xs';
+        el.innerHTML =
+          '<div class="font-semibold text-[#007A33]">' + escHtml(title) + '</div>' +
+          (desc ? '<div class="text-[11px] text-slate-600 mt-0.5">' + escHtml(desc) + '</div>' : '');
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 3200);
+      };
 
       function applyReservationFilter() {
         const q = (searchInput && searchInput.value ? searchInput.value : '').trim().toLowerCase();
+        const rows = Array.from(document.querySelectorAll('.reservation-row'));
+        const emptyRow = document.getElementById('reservations-empty-filter');
         let visibleCount = 0;
 
         rows.forEach((row) => {
@@ -514,6 +544,190 @@ export function renderDashboardPage(props: DashboardViewProps): string {
           emptyRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
         }
       }
+
+      const renderReservationRows = (reservations) => {
+        const tbody = document.getElementById('reservations-tbody');
+        if (!tbody) return;
+        if (!reservations || reservations.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada data reservasi.</td></tr>';
+          return;
+        }
+        const badgeClassFor = (st) =>
+          st === 'Dikonfirmasi'
+            ? 'bg-emerald-50 text-[#007A33] border-emerald-200'
+            : st === 'Check-In'
+              ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : st === 'Selesai'
+                ? 'bg-slate-100 text-slate-700 border-slate-300'
+                : st === 'Batal'
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200';
+
+        tbody.innerHTML = reservations.map((res) => {
+          const st = res.status_reservasi;
+          const searchBlob = [res.kode_booking, res.nama_tamu, res.nomor_kamar, res.nama_kamar].join(' ').toLowerCase().trim();
+          const checkInBtn = st === 'Dikonfirmasi'
+            ? '<form method="POST" action="/admin/reservasi/checkin" class="inline dash-action-form" data-loading-text="Check-In...">' +
+                '<input type="hidden" name="id_reservasi" value="' + escHtml(res.id_reservasi) + '" />' +
+                '<button type="submit" class="px-2.5 py-1.5 bg-[#007A33] hover:bg-[#005A2B] text-white font-semibold rounded text-[11px] cursor-pointer whitespace-nowrap">Check-In</button>' +
+              '</form>'
+            : '';
+          const checkOutBtn = st === 'Check-In'
+            ? '<form method="POST" action="/admin/reservasi/checkout" class="inline dash-action-form" data-loading-text="Check-Out...">' +
+                '<input type="hidden" name="id_reservasi" value="' + escHtml(res.id_reservasi) + '" />' +
+                '<button type="submit" class="px-2.5 py-1.5 bg-[#D4AF37] hover:bg-[#C29B27] text-[#0F1F17] font-semibold rounded text-[11px] cursor-pointer whitespace-nowrap">Check-Out</button>' +
+              '</form>'
+            : '';
+          const cancelBtn = (st === 'Dikonfirmasi' || st === 'Check-In')
+            ? '<form method="POST" action="/admin/reservasi/batal" class="inline dash-action-form" data-loading-text="Membatalkan...">' +
+                '<input type="hidden" name="id_reservasi" value="' + escHtml(res.id_reservasi) + '" />' +
+                '<button type="submit" class="px-2.5 py-1.5 border border-red-300 text-red-700 hover:bg-red-50 font-semibold rounded text-[11px] cursor-pointer whitespace-nowrap">Batal</button>' +
+              '</form>'
+            : '';
+
+          return '<tr class="reservation-row hover:bg-slate-50/70" data-status="' + escHtml(st) + '" data-search="' + escHtml(searchBlob) + '">' +
+            '<td class="px-4 py-3.5">' +
+              '<div class="font-mono font-bold text-[#007A33]">' + escHtml(res.kode_booking) + '</div>' +
+              '<div class="font-semibold text-slate-900 mt-0.5">' + escHtml(res.nama_tamu) + '</div>' +
+              '<div class="text-[11px] text-slate-500">' + escHtml(res.telepon_tamu) + '</div>' +
+            '</td>' +
+            '<td class="px-4 py-3.5">' +
+              '<div class="font-semibold text-slate-900">Kamar ' + escHtml(res.nomor_kamar) + ' &mdash; ' + escHtml(res.nama_kamar) + '</div>' +
+              '<div class="text-[11px] text-slate-500">' + escHtml(res.nama_kategori) + ' &middot; Status Kamar: <strong class="text-slate-700">' + escHtml(res.status_kamar) + '</strong></div>' +
+            '</td>' +
+            '<td class="px-4 py-3.5">' +
+              '<div class="font-medium text-slate-800 tabular-nums">' + escHtml(res.tgl_checkin) + ' &rarr; ' + escHtml(res.tgl_checkout) + ' (' + escHtml(res.jumlah_malam) + ' mlm)</div>' +
+              '<div class="text-[11px] text-slate-500">Promo: <span class="font-mono text-[#007A33]">' + escHtml(res.kode_promo) + '</span></div>' +
+            '</td>' +
+            '<td class="px-4 py-3.5">' +
+              '<div class="font-serif font-bold text-sm text-[#0F1F17] tabular-nums">' + escHtml(fmtRupiah(res.total_tagihan)) + '</div>' +
+              '<div class="text-[11px] text-slate-500">' + escHtml(res.status_pembayaran) + '</div>' +
+            '</td>' +
+            '<td class="px-4 py-3.5">' +
+              '<span class="inline-block px-2.5 py-1 rounded border text-[11px] font-semibold whitespace-nowrap ' + badgeClassFor(st) + '">' + escHtml(st) + '</span>' +
+            '</td>' +
+            '<td class="px-4 py-3.5 text-right">' +
+              '<div class="inline-flex items-center gap-1.5 justify-end flex-wrap">' + checkInBtn + checkOutBtn + cancelBtn + '</div>' +
+            '</td>' +
+          '</tr>';
+        }).join('') +
+        '<tr id="reservations-empty-filter" class="hidden">' +
+          '<td colspan="6" class="px-4 py-8 text-center text-slate-500">Tidak ada reservasi yang cocok dengan filter pencarian saat ini.</td>' +
+        '</tr>';
+        applyReservationFilter();
+      };
+
+      const renderRoomRows = (rooms) => {
+        const tbody = document.getElementById('rooms-tbody');
+        if (!tbody) return;
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.closest && activeEl.closest('#rooms-tbody')) return;
+        if (dirtyRoomIds.size > 0) return;
+
+        tbody.innerHTML = (rooms || []).map((rm) => {
+          const statusOpts = ['Tersedia', 'Terisi', 'Pemeliharaan'].map((opt) =>
+            '<option value="' + opt + '" ' + (rm.status_ketersediaan === opt ? 'selected' : '') + '>' + opt + '</option>'
+          ).join('');
+          return '<tr>' +
+            '<td class="px-4 py-3">' +
+              '<div class="font-mono font-bold text-[#007A33]">' + escHtml(rm.kode_kamar) + ' (No. ' + escHtml(rm.nomor_kamar) + ')</div>' +
+              '<div class="font-semibold text-slate-900">' + escHtml(rm.nama_kamar) + '</div>' +
+            '</td>' +
+            '<td class="px-4 py-3">' +
+              '<div class="text-slate-600">' + escHtml(rm.nama_kategori) + '</div>' +
+              '<div class="font-serif font-bold text-[#0F1F17] tabular-nums">' + escHtml(fmtRupiah(rm.tarif_per_malam)) + '</div>' +
+            '</td>' +
+            '<td class="px-4 py-3">' +
+              '<form method="POST" action="/admin/kamar/status" class="flex items-center gap-2 dash-action-form" data-room-id="' + escHtml(rm.id_kamar) + '" data-loading-text="Menyimpan...">' +
+                '<input type="hidden" name="id_kamar" value="' + escHtml(rm.id_kamar) + '" />' +
+                '<select name="status_ketersediaan" aria-label="Status ketersediaan kamar ' + escHtml(rm.nomor_kamar) + '" class="px-2.5 py-1.5 border border-slate-300 rounded bg-white text-xs">' + statusOpts + '</select>' +
+                '<button type="submit" class="px-2.5 py-1.5 bg-[#005A2B] hover:bg-[#007A33] text-white rounded text-[11px] font-semibold cursor-pointer whitespace-nowrap">Simpan</button>' +
+              '</form>' +
+            '</td>' +
+            '<td class="px-4 py-3 text-right">' +
+              '<form method="POST" action="/admin/kamar/hapus" class="dash-action-form" data-loading-text="Menghapus..." onsubmit="return confirm(\\'Hapus unit kamar ini?\\');">' +
+                '<input type="hidden" name="id_kamar" value="' + escHtml(rm.id_kamar) + '" />' +
+                '<button type="submit" aria-label="Hapus kamar ' + escHtml(rm.nomor_kamar) + '" class="px-2.5 py-1.5 border border-red-200 text-red-700 hover:bg-red-50 rounded text-[11px] font-semibold cursor-pointer whitespace-nowrap">Hapus</button>' +
+              '</form>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      };
+
+      const computeSnapshotSignature = (data) => {
+        const resSig = (data.reservations || []).map((r) => [r.id_reservasi, r.status_reservasi, r.status_kamar, r.total_tagihan].join(':')).join('|');
+        const roomSig = (data.rooms || []).map((r) => [r.id_kamar, r.status_ketersediaan, r.tarif_per_malam].join(':')).join('|');
+        const logSig = (data.auditLogs && data.auditLogs[0]) ? String(data.auditLogs[0].id_log) : '0';
+        const k = data.kpi || {};
+        return [k.okupansi_persen, k.kamar_terisi, k.total_kamar, k.reservasi_aktif, k.pendapatan_lunas, k.kamar_pemeliharaan, resSig, roomSig, logSig].join('#');
+      };
+
+      const syncDashboardLive = async () => {
+        const seq = ++syncSeq;
+        try {
+          const res = await fetch('/api/admin/sync', { cache: 'no-store' });
+          if (!res.ok) return;
+          const json = await res.json();
+          if (seq !== syncSeq || !json || !json.success) return;
+
+          const sig = computeSnapshotSignature(json);
+          if (!lastSyncSig) {
+            lastSyncSig = sig;
+            return;
+          }
+          if (sig === lastSyncSig) return;
+          lastSyncSig = sig;
+
+          if (json.kpi) {
+            document.getElementById('kpi-okupansi').textContent = json.kpi.okupansi_persen + '%';
+            document.getElementById('kpi-okupansi-sub').textContent = json.kpi.kamar_terisi + ' dari ' + json.kpi.total_kamar + ' unit berstatus Terisi';
+            document.getElementById('kpi-aktif').textContent = String(json.kpi.reservasi_aktif);
+            document.getElementById('kpi-pendapatan').textContent = fmtRupiah(json.kpi.pendapatan_lunas);
+            document.getElementById('kpi-pemeliharaan').textContent = String(json.kpi.kamar_pemeliharaan);
+          }
+
+          renderReservationRows(json.reservations);
+          renderRoomRows(json.rooms);
+
+          if (json.subqueryAnalytics) {
+            const rataEl = document.getElementById('subquery-rata');
+            if (rataEl) rataEl.textContent = fmtRupiah(json.subqueryAnalytics.rata_rata_tarif);
+            const listEl = document.getElementById('subquery-list');
+            if (listEl) {
+              listEl.innerHTML = (json.subqueryAnalytics.kamar_premium || []).map((kp) =>
+                '<div class="p-3 bg-[#F8FAFC] border border-slate-200 rounded-lg flex items-center justify-between text-xs">' +
+                  '<div>' +
+                    '<span class="font-mono font-bold text-[#007A33]">' + escHtml(kp.kode_kamar) + '</span>' +
+                    '<strong class="text-slate-900 ml-1">' + escHtml(kp.nama_kamar) + '</strong>' +
+                    '<span class="text-slate-500 block text-[11px]">' + escHtml(kp.nama_kategori) + ' &middot; Status: ' + escHtml(kp.status_ketersediaan) + '</span>' +
+                  '</div>' +
+                  '<span class="font-serif font-bold text-sm text-[#0F1F17] tabular-nums">' + escHtml(fmtRupiah(kp.tarif_per_malam)) + '</span>' +
+                '</div>'
+              ).join('');
+            }
+          }
+
+          const logsEl = document.getElementById('audit-logs-list');
+          if (logsEl && Array.isArray(json.auditLogs)) {
+            logsEl.innerHTML = json.auditLogs.length === 0
+              ? '<p class="text-xs text-slate-500">Belum ada catatan aktivitas dari Trigger.</p>'
+              : json.auditLogs.map((log) =>
+                  '<div class="p-3 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs">' +
+                    '<div class="flex items-center justify-between">' +
+                      '<span class="font-mono font-bold text-[#007A33]">' + escHtml(log.kode_booking || ('RES-' + log.id_reservasi)) + '</span>' +
+                      '<span class="text-[10px] text-slate-400">' + escHtml(log.waktu_perubahan) + '</span>' +
+                    '</div>' +
+                    '<div class="mt-1 font-medium text-slate-800">' + escHtml(log.status_lama ?? '') + ' &rarr; <span class="text-[#007A33] font-semibold">' + escHtml(log.status_baru) + '</span></div>' +
+                    '<p class="text-[11px] text-slate-500 mt-0.5">' + escHtml(log.keterangan ?? '') + '</p>' +
+                  '</div>'
+                ).join('');
+          }
+
+          showDashToast('Data Operasional Disinkronkan', 'Perubahan reservasi & status kamar terbaru telah dimuat otomatis.');
+        } catch {
+          // Abaikan error jaringan sementara saat polling
+        }
+      };
 
       filterBtns.forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -533,6 +747,15 @@ export function renderDashboardPage(props: DashboardViewProps): string {
         searchInput.addEventListener('input', applyReservationFilter);
       }
 
+      const roomsTbody = document.getElementById('rooms-tbody');
+      if (roomsTbody) {
+        roomsTbody.addEventListener('change', (e) => {
+          const form = e.target && e.target.closest ? e.target.closest('form[action="/admin/kamar/status"]') : null;
+          const inp = form ? form.querySelector('input[name="id_kamar"]') : null;
+          if (inp && inp.value) dirtyRoomIds.add(inp.value);
+        });
+      }
+
       document.addEventListener('click', (e) => {
         const target = e.target && e.target.closest ? e.target.closest('button, a.btn-press') : null;
         if (!target || target.disabled) return;
@@ -546,15 +769,24 @@ export function renderDashboardPage(props: DashboardViewProps): string {
         setTimeout(() => wave.remove(), 500);
       });
 
-      document.querySelectorAll('.dash-action-form').forEach((form) => {
-        form.addEventListener('submit', () => {
-          const btn = form.querySelector('button[type="submit"]');
-          if (btn && !btn.disabled) {
-            btn.disabled = true;
-            btn.textContent = form.getAttribute('data-loading-text') || 'Memproses...';
-          }
-        });
+      document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!form || !form.classList || !form.classList.contains('dash-action-form')) return;
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn && !btn.disabled) {
+          btn.disabled = true;
+          btn.textContent = form.getAttribute('data-loading-text') || 'Memproses...';
+        }
       });
+
+      syncDashboardLive();
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) syncDashboardLive();
+      });
+      window.addEventListener('focus', syncDashboardLive);
+      setInterval(() => {
+        if (!document.hidden) syncDashboardLive();
+      }, 6000);
     })();
   </script>
 </body>

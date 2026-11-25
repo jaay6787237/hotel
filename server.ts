@@ -22,11 +22,13 @@ import {
   deleteRoom,
   findByKodeBooking,
   getActivePromos,
+  getAdminSyncSnapshot,
   getAnalitikSubquery,
   getAuditLogs,
   getCategories,
   getKpiMetrics,
   getLaporanMultiJoin,
+  getRoomsWithAvailability,
   getRoomsWithCategory,
   InvalidInputError,
   KamarKotorException,
@@ -37,6 +39,7 @@ import {
   validatePromoCode,
   VoucherTidakValidException,
 } from './src/server/hotelService.ts';
+import { mapRoomToClientDto } from './src/server/views/helpers.ts';
 import { renderLandingPage } from './src/server/views/landing.ts';
 import { renderLoginPage } from './src/server/views/login.ts';
 import { renderDashboardPage } from './src/server/views/dashboard.ts';
@@ -77,8 +80,14 @@ app.get('/', async (req: Request, res: Response) => {
   const searchedCode = String(req.query.cek_kode ?? '').trim();
   const kwitansiCode = String(req.query.kwitansi ?? '').trim();
 
+  const defaultCheckIn = formatYmdOffset(7);
+  const defaultCheckOut = formatYmdOffset(9);
+
   try {
-    [rooms, promos] = await Promise.all([getRoomsWithCategory(), getActivePromos()]);
+    [rooms, promos] = await Promise.all([
+      getRoomsWithAvailability(defaultCheckIn, defaultCheckOut),
+      getActivePromos(),
+    ]);
     if (kwitansiCode !== '') {
       kwitansi = await findByKodeBooking(kwitansiCode);
       if (!kwitansi) {
@@ -104,10 +113,29 @@ app.get('/', async (req: Request, res: Response) => {
       searchedCode,
       dbError,
       flash,
-      defaultCheckIn: formatYmdOffset(7),
-      defaultCheckOut: formatYmdOffset(9),
+      defaultCheckIn,
+      defaultCheckOut,
     })
   );
+});
+
+app.get('/api/rooms', async (req: Request, res: Response) => {
+  const checkin = String(req.query.checkin ?? '').trim();
+  const checkout = String(req.query.checkout ?? '').trim();
+  try {
+    const rooms = await getRoomsWithAvailability(checkin || undefined, checkout || undefined);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      rooms: rooms.map(mapRoomToClientDto),
+      serverTime: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 // Endpoint API Reservasi & Promo Publik
@@ -299,7 +327,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
     res.json({
       status: 'healthy',
       runtime: `Node.js ${process.version} Express TypeScript`,
-      database: 'PostgreSQL Cloud SQL (pg)',
+      database: process.env.SQL_HOST ? 'PostgreSQL Cloud SQL (pg)' : 'PostgreSQL Supabase / Remote (pg)',
       totalKamar,
     });
   } catch (err) {
@@ -403,6 +431,24 @@ const dashboardHandler = async (req: Request, res: Response) => {
 app.get('/admin', dashboardHandler);
 app.get('/admin/dashboard', dashboardHandler);
 
+app.get('/api/admin/sync', async (req: Request, res: Response) => {
+  const session = getAuthenticatedAdmin(req);
+  if (!session) {
+    res.status(401).json({ success: false, error: 'Sesi admin berakhir.' });
+    return;
+  }
+  try {
+    const snapshot = await getAdminSyncSnapshot();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, ...snapshot });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 app.post('/admin/reservasi/checkin', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   const idReservasi = Number(req.body?.id_reservasi ?? 0);
@@ -478,13 +524,17 @@ app.post('/admin/kamar/hapus', async (req: Request, res: Response) => {
   try {
     await deleteRoom(idKamar);
     setFlash(res, req, 'success', `Unit kamar #${idKamar} berhasil dihapus.`);
-  } catch {
-    setFlash(
-      res,
-      req,
-      'error',
-      'Kamar tidak dapat dihapus karena sudah terikat dengan data riwayat reservasi (Integrity Constraint).'
-    );
+  } catch (err) {
+    if (err instanceof InvalidInputError) {
+      setFlash(res, req, 'error', err.message);
+    } else {
+      setFlash(
+        res,
+        req,
+        'error',
+        'Kamar tidak dapat dihapus karena sudah terikat dengan data riwayat reservasi (Integrity Constraint).'
+      );
+    }
   }
   res.redirect('/admin/dashboard#manajemen-kamar');
 });

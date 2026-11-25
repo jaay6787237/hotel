@@ -254,7 +254,7 @@ BEGIN
     FROM public.kamar
     WHERE id_kamar = p_id_kamar;
 
-    IF v_status_kamar IS NULL OR v_status_kamar = 'Pemeliharaan' THEN
+    IF v_status_kamar IS NULL OR v_status_kamar <> 'Tersedia' THEN
         RETURN FALSE;
     END IF;
 
@@ -395,7 +395,7 @@ BEGIN
 
     v_tersedia := public.sf_cek_ketersediaan_kamar(p_id_kamar, p_tgl_checkin, p_tgl_checkout);
     IF NOT v_tersedia THEN
-        RAISE EXCEPTION 'KAMAR_PENUH: Kamar sudah dipesan pada tanggal tersebut atau sedang pemeliharaan.';
+        RAISE EXCEPTION 'KAMAR_PENUH: Kamar sedang berstatus Terisi, dalam Pemeliharaan, atau sudah dipesan pada tanggal tersebut.';
     END IF;
 
     SELECT tarif_per_malam INTO v_tarif

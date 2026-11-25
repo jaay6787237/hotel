@@ -69,6 +69,10 @@ export function resolveNextRoomStatus(
   return currentRoomStatus;
 }
 
+export function isRoomBookableStatus(status: string): boolean {
+  return String(status ?? '').trim() === 'Tersedia';
+}
+
 export function generateBookingCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let suffix = '';

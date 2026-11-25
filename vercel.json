@@ -6,12 +6,12 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "src/server/**"
+      "includeFiles": "{src/server/**,public/**}"
     }
   },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|Dokumentasi_RDBMS_Bukit_Randu\\.pdf).*)",
       "destination": "/api/index"
     }
   ]

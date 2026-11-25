@@ -1,6 +1,7 @@
 import type { FlashMessage } from '../auth.ts';
 import type { PromoRow, ReservationReportRow, RoomRow } from '../hotelService.ts';
-import { escapeHtml, formatRupiah, safeJson } from './helpers.ts';
+import { escapeHtml, formatRupiah, mapRoomToClientDto, safeJson } from './helpers.ts';
+import { renderRdbmsArchitectureSection } from './rdbmsSection.ts';
 
 export interface LandingViewProps {
   rooms: RoomRow[];
@@ -84,29 +85,7 @@ export function renderLandingPage(props: LandingViewProps): string {
     defaultCheckOut,
   } = props;
 
-  const roomsPayload = rooms.map((r) => {
-    const tarifIdr = Number(r.tarif_per_malam ?? 0);
-    return {
-      id_kamar: Number(r.id_kamar),
-      kode_kamar: String(r.kode_kamar),
-      nomor_kamar: String(r.nomor_kamar),
-      name: String(r.nama_kamar),
-      tagline: String(r.tagline ?? ''),
-      description: String(r.deskripsi ?? ''),
-      categoryCode: String(r.kode_kategori ?? 'KAT-DLX'),
-      categoryName: String(r.nama_kategori ?? 'Suite Panorama'),
-      basePriceIdr: tarifIdr,
-      basePriceUsd: Math.round(tarifIdr / 15500),
-      maxGuests: Number(r.kapasitas_tamu ?? 2),
-      bedType: String(r.tipe_kasur ?? 'King Bed'),
-      view: String(r.pemandangan ?? 'Bukit & Teluk'),
-      sqm: Number(r.luas_m2 ?? 65),
-      image: String(r.url_gambar || '/assets/images/suite_presidential_1794410440213.jpg'),
-      amenities: Array.isArray(r.fasilitas_array) ? r.fasilitas_array : [],
-      featured: Boolean(r.is_featured),
-      status_ketersediaan: String(r.status_ketersediaan ?? 'Tersedia'),
-    };
-  });
+  const roomsPayload = rooms.map(mapRoomToClientDto);
 
   const promoMap: Record<string, { persen: number; maks: number; nama: string }> = {};
   for (const p of promos) {
@@ -282,7 +261,7 @@ export function renderLandingPage(props: LandingViewProps): string {
   <meta name="description" content="Pengalaman reservasi dan keramahan resor bukit mewah dengan pemandangan panorama Bandar Lampung." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -291,6 +270,7 @@ export function renderLandingPage(props: LandingViewProps): string {
           fontFamily: {
             serif: ['"Playfair Display"', 'Georgia', 'serif'],
             sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
           },
         },
       },
@@ -454,10 +434,10 @@ export function renderLandingPage(props: LandingViewProps): string {
 
         <nav class="hidden lg:flex items-center gap-7 text-[14px] font-medium text-slate-700" aria-label="Navigasi Utama">
           <a href="#suites" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Suite &amp; Villa</a>
-          <a href="#dining" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Restoran Bukit</a>
-          <a href="#experiences" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Kebugaran &amp; Spa</a>
+          <a href="#dining" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Fasilitas</a>
           <a href="#cek-booking" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Cek Booking</a>
-          <a href="#location" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Lokasi &amp; Kontak</a>
+          <a href="#arsitektur-db" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Arsitektur SQL</a>
+          <a href="#location" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Lokasi</a>
         </nav>
 
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -509,6 +489,7 @@ export function renderLandingPage(props: LandingViewProps): string {
       <a href="#dining" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Restoran Bukit</a>
       <a href="#experiences" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Kebugaran &amp; Spa</a>
       <a href="#cek-booking" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Cek Booking</a>
+      <a href="#arsitektur-db" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Arsitektur SQL (SP, SF, Trigger)</a>
       <a href="#location" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Lokasi &amp; Kontak</a>
       <a href="/admin/login" class="block py-2 text-base font-semibold text-[#007A33]">Login Portal Admin</a>
       <button
@@ -954,6 +935,9 @@ export function renderLandingPage(props: LandingViewProps): string {
         </div>
       </div>
     </section>
+
+    <!-- ARSITEKTUR BASIS DATA: TRIGGER, SP, SF, MULTI-JOIN & SUBQUERY -->
+    ${renderRdbmsArchitectureSection()}
   </main>
 
   <!-- FOOTER -->
@@ -978,6 +962,7 @@ export function renderLandingPage(props: LandingViewProps): string {
             <li><a href="#suites" class="hover:text-white transition-colors">Grand Horizon Hillside Villa</a></li>
             <li><a href="#suites" class="hover:text-white transition-colors">Deluxe Panoramic Sanctuary</a></li>
             <li><a href="#cek-booking" class="hover:text-white transition-colors">Cek Kode Booking</a></li>
+            <li><a href="#arsitektur-db" class="hover:text-white transition-colors">Penjelasan SP, SF, Trigger &amp; Join</a></li>
             <li><a href="/admin/login" class="hover:text-[#D4AF37] text-emerald-400 font-semibold transition-colors">Portal Admin Front Office</a></li>
           </ul>
         </div>
@@ -1091,6 +1076,7 @@ export function renderLandingPage(props: LandingViewProps): string {
       </div>
 
       <div class="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
+        <div id="bm-error-box" role="alert" class="hidden p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium"></div>
         <div id="booking-step-1" class="space-y-6">
           <div class="flex flex-col sm:flex-row gap-4 p-4 bg-[#F8FAFC] rounded-lg border border-slate-200">
             <img id="bm-img" src="" alt="" class="w-full sm:w-36 h-24 object-cover rounded" />
@@ -1148,9 +1134,8 @@ export function renderLandingPage(props: LandingViewProps): string {
         </div>
 
         <form id="booking-step-2" class="hidden space-y-4">
-          <div id="bm-error-box" class="hidden p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-medium"></div>
           <div class="p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-[#007A33]">
-            Reservasi Anda diproses langsung ke database PostgreSQL Cloud SQL.
+            Reservasi Anda diproses dan dikunci secara atomik di database PostgreSQL.
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1190,54 +1175,99 @@ export function renderLandingPage(props: LandingViewProps): string {
           </div>
         </form>
 
-        <div id="booking-step-3" class="hidden space-y-6">
-          <div id="printable-voucher" class="space-y-5">
-            <div class="p-6 bg-emerald-50/70 border border-[#007A33]/30 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div id="booking-step-3" class="hidden space-y-5">
+          <div id="printable-voucher" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div class="bg-[#0F1F17] text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <span class="text-xs font-semibold uppercase tracking-wider text-[#007A33]">Reservasi Terkonfirmasi di Database</span>
-                <h4 class="text-2xl font-serif font-bold text-slate-900">Bukti Kwitansi Digital Resmi</h4>
-                <p id="voucher-guest-email" class="text-xs text-slate-600 mt-0.5"></p>
+                <span class="text-[10px] font-semibold uppercase tracking-widest text-[#D4AF37] block">Struk Pembayaran &amp; Konfirmasi Reservasi Resmi</span>
+                <h4 class="text-xl font-serif font-bold text-white mt-0.5">Bukit Randu Hotel &amp; Resort</h4>
+                <p class="text-[11px] text-slate-300">Jl. Kamboja No. 1-2, Kebon Jeruk, Bandar Lampung</p>
               </div>
-              <div class="bg-white px-4 py-2.5 rounded border border-slate-200 shadow-xs text-center sm:text-right">
-                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Kode Booking</span>
-                <span id="voucher-code" class="font-mono font-bold text-lg text-[#007A33]"></span>
+              <div class="bg-white/10 border border-white/15 px-3.5 py-2 rounded text-left sm:text-right shrink-0">
+                <span class="text-[10px] uppercase font-semibold text-slate-300 block">Kode Booking</span>
+                <span id="voucher-code" class="font-mono font-bold text-base text-[#D4AF37]"></span>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border border-slate-200 rounded-lg p-4 bg-white text-xs">
-              <div>
-                <span class="font-semibold text-slate-400 uppercase text-[10px] block">Akomodasi Dipesan</span>
-                <span id="voucher-room" class="font-serif font-bold text-slate-900 text-sm block mt-1"></span>
+            <div class="p-5 space-y-4 text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-3 border-b border-dashed border-slate-300">
+                <div>
+                  <span class="text-[10px] uppercase font-semibold text-slate-400 block">No. Referensi Struk</span>
+                  <span id="voucher-ref" class="font-mono font-semibold text-slate-800 block mt-0.5"></span>
+                </div>
+                <div>
+                  <span class="text-[10px] uppercase font-semibold text-slate-400 block">Waktu Terbit</span>
+                  <span id="voucher-time" class="text-slate-700 font-medium block mt-0.5 tabular-nums"></span>
+                </div>
+                <div class="sm:text-right">
+                  <span class="text-[10px] uppercase font-semibold text-slate-400 block">Status Transaksi</span>
+                  <span id="voucher-status" class="inline-block mt-0.5 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[#007A33] font-bold"></span>
+                </div>
               </div>
-              <div>
-                <span class="font-semibold text-slate-400 uppercase text-[10px] block">Jadwal Menginap</span>
-                <span id="voucher-dates" class="font-medium text-slate-900 text-sm block mt-1"></span>
-              </div>
-              <div>
-                <span class="font-semibold text-slate-400 uppercase text-[10px] block">Tamu Utama</span>
-                <span id="voucher-guest" class="font-medium text-slate-900 text-sm block mt-1"></span>
-              </div>
-            </div>
 
-            <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-              <div>
-                <span class="text-xs text-slate-600 font-medium block">Total Pembayaran Sah (Termasuk Pajak 10% &amp; Layanan 5%)</span>
-                <span id="voucher-payment" class="text-xs text-slate-400"></span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-3 border-b border-dashed border-slate-300">
+                <div>
+                  <span class="font-semibold text-slate-400 uppercase text-[10px] block">Data Tamu Utama</span>
+                  <span id="voucher-guest" class="font-semibold text-slate-900 text-sm block mt-0.5"></span>
+                  <span id="voucher-guest-email" class="text-[11px] text-slate-500 block mt-0.5"></span>
+                </div>
+                <div>
+                  <span class="font-semibold text-slate-400 uppercase text-[10px] block">Akomodasi &amp; Menginap</span>
+                  <span id="voucher-room" class="font-serif font-bold text-slate-900 text-sm block mt-0.5"></span>
+                  <span id="voucher-dates" class="text-[11px] text-slate-700 font-medium block mt-0.5"></span>
+                  <span id="voucher-guests" class="text-[11px] text-slate-500 block mt-0.5"></span>
+                </div>
               </div>
-              <span id="voucher-total" class="text-2xl font-serif font-bold text-[#007A33] tabular-nums"></span>
+
+              <div id="voucher-notes-row" class="hidden pb-3 border-b border-dashed border-slate-300">
+                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Permintaan Khusus Tamu</span>
+                <span id="voucher-notes" class="text-slate-700 italic block mt-0.5"></span>
+              </div>
+
+              <div class="space-y-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg p-4">
+                <div class="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">Rincian Biaya Menginap</div>
+                <div class="flex justify-between text-slate-700">
+                  <span>Subtotal Tarif Kamar</span>
+                  <span id="voucher-subtotal" class="tabular-nums font-medium"></span>
+                </div>
+                <div id="voucher-discount-row" class="hidden flex justify-between text-[#007A33]">
+                  <span>Potongan Promo (<span id="voucher-discount-code" class="font-mono"></span>)</span>
+                  <span id="voucher-discount" class="tabular-nums font-semibold"></span>
+                </div>
+                <div class="flex justify-between text-slate-700">
+                  <span>Biaya Layanan Resor (5%)</span>
+                  <span id="voucher-service" class="tabular-nums font-medium"></span>
+                </div>
+                <div class="flex justify-between text-slate-700">
+                  <span>Pajak Pemerintah PPN (10%)</span>
+                  <span id="voucher-tax" class="tabular-nums font-medium"></span>
+                </div>
+                <div class="pt-2.5 mt-2 border-t border-dashed border-slate-300 flex items-center justify-between gap-3">
+                  <div>
+                    <span class="text-xs font-bold text-[#0F1F17] block">Total Pembayaran Sah</span>
+                    <span id="voucher-payment" class="text-[11px] text-slate-500 block mt-0.5"></span>
+                  </div>
+                  <span id="voucher-total" class="text-2xl font-serif font-bold text-[#007A33] tabular-nums shrink-0"></span>
+                </div>
+              </div>
+
+              <p class="text-[11px] text-slate-500 text-center pt-1">
+                Tunjukkan kode booking ini di meja Front Office saat Check-In. Simpan atau cetak struk ini sebagai bukti reservasi sah.
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="px-6 py-4 bg-[#F8FAFC] border-t border-slate-200 flex items-center justify-between shrink-0">
+      <div class="px-6 py-4 bg-[#F8FAFC] border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <button type="button" id="bm-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Batal</button>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <button type="button" id="bm-back-btn" class="hidden px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">Kembali ke Tarif</button>
           <button type="button" id="bm-next-btn" class="px-6 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded shadow-xs cursor-pointer">Lanjut ke Data Tamu &rarr;</button>
           <button type="submit" form="booking-step-2" id="bm-submit-btn" class="hidden px-6 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded shadow-xs cursor-pointer">Konfirmasi &amp; Kunci Reservasi &#10003;</button>
-          <button type="button" id="bm-print-btn" onclick="printSection('printable-voucher')" class="btn-ripple-dark hidden px-4 py-2 text-xs font-semibold text-[#007A33] border border-[#007A33] rounded cursor-pointer">Cetak Kwitansi</button>
-          <button type="button" id="bm-done-btn" class="hidden px-6 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded cursor-pointer">Selesai</button>
+          <a id="bm-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-press btn-ripple-dark hidden px-4 py-2 text-xs font-semibold text-slate-700 border border-slate-300 bg-white hover:bg-slate-50 rounded whitespace-nowrap">Buka Struk Lengkap</a>
+          <button type="button" id="bm-print-btn" onclick="printSection('printable-voucher')" class="btn-ripple-dark hidden px-4 py-2 text-xs font-semibold text-[#007A33] border border-[#007A33] rounded cursor-pointer whitespace-nowrap">Cetak Struk</button>
+          <button type="button" id="bm-done-btn" class="hidden px-6 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded cursor-pointer whitespace-nowrap">Selesai</button>
         </div>
       </div>
     </div>
@@ -1291,7 +1321,7 @@ export function renderLandingPage(props: LandingViewProps): string {
   <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"></div>
 
   <script>
-    const ROOMS_DATA = ${safeJson(roomsPayload)};
+    let ROOMS_DATA = ${safeJson(roomsPayload)};
     const PROMO_MAP = ${safeJson(promoMap)};
 
     let currency = 'IDR';
@@ -1302,6 +1332,47 @@ export function renderLandingPage(props: LandingViewProps): string {
     let activeRoom = null;
     let bookingStep = 1;
     let lastFavKode = null;
+    let syncSeq = 0;
+
+    const getRoomsSignature = (list) =>
+      (list || [])
+        .map((r) => [r.id_kamar, r.status_ketersediaan, r.is_bookable, r.basePriceIdr, r.name].join(':'))
+        .join('|');
+
+    const getRoomBlockInfo = (room) => {
+      if (!room) return { btnText: 'Tidak Tersedia', detailBtnText: 'Tidak Tersedia', badgeCls: 'bg-slate-700', badgeText: 'Tidak Tersedia', toastTitle: 'Kamar Tidak Tersedia', toastDesc: 'Unit kamar tidak ditemukan.' };
+      if (room.status_ketersediaan === 'Terisi') {
+        return {
+          btnText: 'Sedang Terisi',
+          detailBtnText: 'Sedang Terisi',
+          badgeCls: 'bg-amber-600',
+          badgeText: 'Terisi',
+          toastTitle: 'Kamar Sedang Terisi',
+          toastDesc: 'Unit ini sedang berstatus Terisi oleh tamu dan tidak dapat dipesan saat ini.',
+        };
+      }
+      if (room.status_ketersediaan === 'Pemeliharaan') {
+        return {
+          btnText: 'Pemeliharaan',
+          detailBtnText: 'Dalam Pemeliharaan',
+          badgeCls: 'bg-red-700',
+          badgeText: 'Pemeliharaan',
+          toastTitle: 'Kamar Dalam Pemeliharaan',
+          toastDesc: 'Unit ini sedang dirawat teknisi kami. Silakan pilih suite lain yang tersedia.',
+        };
+      }
+      if (room.is_bookable === false || room.status_ketersediaan !== 'Tersedia') {
+        return {
+          btnText: 'Terpesan di Tanggal Ini',
+          detailBtnText: 'Terpesan di Tanggal Ini',
+          badgeCls: 'bg-slate-700',
+          badgeText: 'Terpesan',
+          toastTitle: 'Tanggal Tidak Tersedia',
+          toastDesc: 'Kamar sudah dipesan pada rentang tanggal yang dipilih. Silakan pilih tanggal atau suite lain.',
+        };
+      }
+      return null;
+    };
 
     const escHtml = (value) =>
       String(value ?? '')
@@ -1456,7 +1527,7 @@ export function renderLandingPage(props: LandingViewProps): string {
       empty.classList.add('hidden');
       grid.innerHTML = list.map((r, idx) => {
         const isFav = favorites.includes(r.kode_kamar);
-        const isMaintenance = r.status_ketersediaan === 'Pemeliharaan';
+        const block = getRoomBlockInfo(r);
         const rawSubtotal = r.basePriceIdr * nights;
         let diskonTotal = 0;
         if (promoInfo && discountPct > 0) {
@@ -1471,13 +1542,16 @@ export function renderLandingPage(props: LandingViewProps): string {
         const amenitiesHtml = (r.amenities || []).slice(0, 3).map((a) =>
           '<div class="flex items-center gap-1.5"><span class="text-[#D4AF37] font-bold">✓</span><span>' + escHtml(a) + '</span></div>'
         ).join('');
-        const statusBadge = r.status_ketersediaan !== 'Tersedia'
-          ? '<span class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ' + (r.status_ketersediaan === 'Terisi' ? 'bg-amber-600' : 'bg-red-700') + ' text-white rounded shadow-xs">' + escHtml(r.status_ketersediaan) + '</span>'
+        const statusBadge = block
+          ? '<span class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ' + block.badgeCls + ' text-white rounded shadow-xs">' + escHtml(block.badgeText) + '</span>'
           : '';
         const heartAnimClass = lastFavKode === r.kode_kamar ? ' heart-pop' : '';
+        const actionButtonHtml = block
+          ? '<button type="button" aria-disabled="true" data-room-blocked="1" onclick="showToast(' + JSON.stringify(block.toastTitle) + ', ' + JSON.stringify(block.toastDesc) + ', true)" class="btn-ripple-dark px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-red-200 rounded cursor-not-allowed whitespace-nowrap">' + escHtml(block.btnText) + '</button>'
+          : '<button type="button" onclick="openBookingModal(' + r.id_kamar + ')" class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white bg-[#007A33] hover:bg-[#005A2B] rounded shadow-xs transition-colors cursor-pointer whitespace-nowrap">Pesan →</button>';
 
         return (
-          '<article class="room-card-enter group bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-[#D4AF37]/60 transition-all duration-300 flex flex-col justify-between" style="animation-delay:' + (idx * 65) + 'ms">' +
+          '<article data-room-id="' + r.id_kamar + '" data-room-status="' + escHtml(r.status_ketersediaan) + '" data-room-bookable="' + String(Boolean(!block)) + '" class="room-card-enter group bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-[#D4AF37]/60 transition-all duration-300 flex flex-col justify-between" style="animation-delay:' + (idx * 65) + 'ms">' +
             '<div class="relative aspect-[16/10] overflow-hidden bg-slate-100">' +
               '<img src="' + escHtml(r.image) + '" alt="' + escHtml(r.name) + '" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />' +
               '<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80"></div>' +
@@ -1503,21 +1577,21 @@ export function renderLandingPage(props: LandingViewProps): string {
                 '<p class="text-xs sm:text-sm text-slate-600 mt-2 line-clamp-2 leading-relaxed">' + escHtml(r.tagline) + '</p>' +
                 '<div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">' + amenitiesHtml + '</div>' +
               '</div>' +
-              '<div class="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-end justify-between gap-4">' +
-                '<div>' +
-                  '<span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Tarif per Malam (No. ' + escHtml(r.nomor_kamar) + ')</span>' +
-                  '<div class="flex items-baseline gap-2 mt-0.5">' +
-                    (diskonTotal > 0 ? '<span class="text-xs text-slate-500 line-through tabular-nums">' + fmtCurrency(r.basePriceIdr) + '</span>' : '') +
-                    '<span class="text-xl font-serif font-bold text-[#0F1F17] tabular-nums">' + fmtCurrency(effectiveNightly) + '</span>' +
-                    '<span class="text-xs text-slate-600">/ malam</span>' +
+              '<div class="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-3.5">' +
+                '<div class="flex items-end justify-between gap-3 flex-wrap">' +
+                  '<div>' +
+                    '<span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block whitespace-nowrap">Tarif per Malam (No. ' + escHtml(r.nomor_kamar) + ')</span>' +
+                    '<div class="flex items-baseline gap-1.5 mt-0.5 whitespace-nowrap">' +
+                      (diskonTotal > 0 ? '<span class="text-xs text-slate-500 line-through tabular-nums">' + fmtCurrency(r.basePriceIdr) + '</span>' : '') +
+                      '<span class="text-xl font-serif font-bold text-[#0F1F17] tabular-nums">' + fmtCurrency(effectiveNightly) + '</span>' +
+                      '<span class="text-xs text-slate-600">/ malam</span>' +
+                    '</div>' +
                   '</div>' +
-                  (nights > 1 ? '<span class="text-[11px] text-slate-600 block mt-0.5 tabular-nums">Total ' + nights + ' malam: ' + fmtCurrency(totalAfterDiscount) + '</span>' : '') +
+                  (nights > 1 ? '<span class="text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">Total ' + nights + ' mlm: ' + fmtCurrency(totalAfterDiscount) + '</span>' : '') +
                 '</div>' +
-                '<div class="flex items-center gap-2 shrink-0">' +
-                  '<button type="button" onclick="openDetailModal(' + r.id_kamar + ')" class="btn-ripple-dark px-3.5 py-2.5 text-xs font-semibold text-[#007A33] border border-[#D4AF37] hover:bg-[#D4AF37]/10 rounded transition-colors cursor-pointer whitespace-nowrap">Detail</button>' +
-                  (isMaintenance
-                    ? '<button type="button" onclick="showToast(\\'Kamar Dalam Pemeliharaan\\', \\'Unit ini sedang dirawat teknisi kami. Silakan pilih suite lain yang tersedia.\\', true)" class="btn-ripple-dark px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-red-700 bg-red-50 border border-red-200 rounded cursor-not-allowed whitespace-nowrap">Pemeliharaan</button>'
-                    : '<button type="button" onclick="openBookingModal(' + r.id_kamar + ')" class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white bg-[#007A33] hover:bg-[#005A2B] rounded shadow-xs transition-colors cursor-pointer whitespace-nowrap">Pesan →</button>') +
+                '<div class="flex items-center gap-2 w-full">' +
+                  '<button type="button" onclick="openDetailModal(' + r.id_kamar + ')" class="btn-ripple-dark px-4 py-2.5 text-xs font-semibold text-[#007A33] border border-[#D4AF37] hover:bg-[#D4AF37]/10 rounded transition-colors cursor-pointer whitespace-nowrap">Detail</button>' +
+                  '<div class="flex-1 flex justify-end">' + actionButtonHtml + '</div>' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -1543,6 +1617,21 @@ export function renderLandingPage(props: LandingViewProps): string {
       renderRooms();
     };
 
+    const syncDetailModalButton = (room) => {
+      const reserveBtn = document.getElementById('detail-reserve-btn');
+      if (!reserveBtn || !room) return;
+      const block = getRoomBlockInfo(room);
+      if (block) {
+        reserveBtn.textContent = block.detailBtnText;
+        reserveBtn.setAttribute('aria-disabled', 'true');
+        reserveBtn.className = 'btn-ripple-dark px-4 sm:px-5 py-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold uppercase tracking-wider rounded-md cursor-not-allowed whitespace-nowrap shrink-0';
+      } else {
+        reserveBtn.innerHTML = '<span>Pesan Suite Ini &rarr;</span>';
+        reserveBtn.removeAttribute('aria-disabled');
+        reserveBtn.className = 'px-4 sm:px-5 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded-md shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0';
+      }
+    };
+
     window.openDetailModal = (idKamar) => {
       const room = ROOMS_DATA.find((r) => r.id_kamar === idKamar);
       if (!room) return;
@@ -1564,14 +1653,7 @@ export function renderLandingPage(props: LandingViewProps): string {
           '<span class="leading-snug">' + escHtml(a) + '</span>' +
         '</div>'
       ).join('');
-      const reserveBtn = document.getElementById('detail-reserve-btn');
-      if (room.status_ketersediaan === 'Pemeliharaan') {
-        reserveBtn.textContent = 'Dalam Pemeliharaan';
-        reserveBtn.className = 'btn-ripple-dark px-4 sm:px-5 py-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold uppercase tracking-wider rounded-md cursor-not-allowed whitespace-nowrap shrink-0';
-      } else {
-        reserveBtn.innerHTML = '<span>Pesan Suite Ini &rarr;</span>';
-        reserveBtn.className = 'px-4 sm:px-5 py-2.5 bg-[#007A33] hover:bg-[#005A2B] text-white text-xs font-semibold uppercase tracking-wider rounded-md shadow-xs flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0';
-      }
+      syncDetailModalButton(room);
       document.getElementById('room-detail-modal').classList.remove('hidden');
     };
 
@@ -1623,27 +1705,38 @@ export function renderLandingPage(props: LandingViewProps): string {
       document.getElementById('bm-back-btn').classList.toggle('hidden', step !== 2);
       document.getElementById('bm-next-btn').classList.toggle('hidden', step !== 1);
       document.getElementById('bm-submit-btn').classList.toggle('hidden', step !== 2);
+      document.getElementById('bm-receipt-link').classList.toggle('hidden', step !== 3);
       document.getElementById('bm-print-btn').classList.toggle('hidden', step !== 3);
       document.getElementById('bm-done-btn').classList.toggle('hidden', step !== 3);
+
+      const errBox = document.getElementById('bm-error-box');
+      if (errBox && step === 3) {
+        errBox.classList.add('hidden');
+      }
 
       const labelMap = {
         1: 'Langkah 1 dari 3: Rincian Reservasi',
         2: 'Langkah 2 dari 3: Data Tamu & Kontak',
-        3: 'Reservasi Terkonfirmasi & Dijamin',
+        3: 'Reservasi Terkonfirmasi & Struk Resmi',
       };
       document.getElementById('booking-step-label').textContent = labelMap[step];
       if (step === 3) {
-        document.getElementById('booking-modal-title').textContent = 'Voucher Konfirmasi Reservasi';
+        document.getElementById('booking-modal-title').textContent = 'Struk Pembayaran & Reservasi';
       } else if (activeRoom) {
         document.getElementById('booking-modal-title').textContent = activeRoom.name;
       }
     };
 
     window.openBookingModal = (idKamar) => {
-      const room = ROOMS_DATA.find((r) => r.id_kamar === idKamar) || ROOMS_DATA.find((r) => r.status_ketersediaan !== 'Pemeliharaan') || ROOMS_DATA[0];
-      if (!room) return;
-      if (room.status_ketersediaan === 'Pemeliharaan') {
-        showToast('Kamar Dalam Pemeliharaan', room.name + ' sedang dirawat teknisi kami. Silakan pilih suite lain yang tersedia.', true);
+      const requested = ROOMS_DATA.find((r) => r.id_kamar === idKamar);
+      const room = requested || ROOMS_DATA.find((r) => !getRoomBlockInfo(r));
+      if (!room) {
+        showToast('Semua Kamar Sedang Penuh', 'Saat ini tidak ada kamar berstatus Tersedia untuk dipesan.', true);
+        return;
+      }
+      const block = getRoomBlockInfo(room);
+      if (block) {
+        showToast(block.toastTitle, block.toastDesc, true);
         return;
       }
       activeRoom = room;
@@ -1658,6 +1751,8 @@ export function renderLandingPage(props: LandingViewProps): string {
       document.getElementById('bm-checkout').min = addUtcDays(barCi, 1);
       document.getElementById('bm-promo').value = document.getElementById('bar-promo-input').value;
       document.getElementById('bm-error-box').classList.add('hidden');
+      document.getElementById('bm-next-btn').disabled = false;
+      document.getElementById('bm-submit-btn').disabled = false;
 
       updateBookingSummary();
       setBookingStep(1);
@@ -1666,6 +1761,9 @@ export function renderLandingPage(props: LandingViewProps): string {
 
     const closeBookingModal = () => {
       document.getElementById('booking-modal').classList.add('hidden');
+      if (typeof window.resyncRoomsToBar === 'function') {
+        window.resyncRoomsToBar();
+      }
     };
 
     window.openExperienceModal = (title) => {
@@ -1754,9 +1852,64 @@ export function renderLandingPage(props: LandingViewProps): string {
         showToast('Mata Uang Diperbarui', 'Menampilkan tarif estimasi dalam ' + currency + '.');
       });
 
+      const syncRoomsLive = async (notifyOnChange = false, customCi, customCo) => {
+        const ci = customCi || document.getElementById('bar-checkin').value;
+        const co = customCo || document.getElementById('bar-checkout').value;
+        const seq = ++syncSeq;
+        try {
+          const qs = new URLSearchParams();
+          if (ci) qs.set('checkin', ci);
+          if (co) qs.set('checkout', co);
+          const res = await fetch('/api/rooms?' + qs.toString(), { cache: 'no-store' });
+          if (!res.ok) return;
+          const json = await res.json();
+          if (seq !== syncSeq || !json || !json.success || !Array.isArray(json.rooms)) return;
+
+          const prevSig = getRoomsSignature(ROOMS_DATA);
+          const nextSig = getRoomsSignature(json.rooms);
+          if (prevSig === nextSig) return;
+
+          ROOMS_DATA = json.rooms;
+          renderRooms();
+
+          if (activeRoom) {
+            const updated = ROOMS_DATA.find((r) => r.id_kamar === activeRoom.id_kamar) || null;
+            activeRoom = updated;
+            const detailOpen = !document.getElementById('room-detail-modal').classList.contains('hidden');
+            if (detailOpen && updated) {
+              syncDetailModalButton(updated);
+            }
+            const bookingOpen = !document.getElementById('booking-modal').classList.contains('hidden');
+            if (bookingOpen && bookingStep !== 3) {
+              const block = getRoomBlockInfo(updated);
+              const errBox = document.getElementById('bm-error-box');
+              if (block) {
+                document.getElementById('bm-next-btn').disabled = true;
+                document.getElementById('bm-submit-btn').disabled = true;
+                errBox.textContent = block.toastDesc;
+                errBox.classList.remove('hidden');
+                showToast(block.toastTitle, block.toastDesc, true);
+              } else {
+                document.getElementById('bm-next-btn').disabled = false;
+                document.getElementById('bm-submit-btn').disabled = false;
+                errBox.classList.add('hidden');
+              }
+            }
+          }
+
+          if (notifyOnChange) {
+            showToast('Ketersediaan Kamar Diperbarui', 'Status kamar baru saja disinkronkan secara real-time.');
+          }
+        } catch {
+          // Abaikan kesalahan jaringan sesaat pada polling latar belakang
+        }
+      };
+
+      window.resyncRoomsToBar = () => syncRoomsLive(false);
+
       const getDefaultBookRoomId = () => {
-        const avail = ROOMS_DATA.find((r) => r.status_ketersediaan !== 'Pemeliharaan');
-        return (avail || ROOMS_DATA[0])?.id_kamar;
+        const avail = ROOMS_DATA.find((r) => !getRoomBlockInfo(r));
+        return avail ? avail.id_kamar : null;
       };
 
       document.getElementById('navbar-book-btn').addEventListener('click', () => openBookingModal(getDefaultBookRoomId()));
@@ -1777,6 +1930,7 @@ export function renderLandingPage(props: LandingViewProps): string {
         }
         updateDateDisplays();
         renderRooms();
+        syncRoomsLive(false);
       });
 
       document.getElementById('bar-checkout').addEventListener('change', () => {
@@ -1788,6 +1942,7 @@ export function renderLandingPage(props: LandingViewProps): string {
         }
         updateDateDisplays();
         renderRooms();
+        syncRoomsLive(false);
       });
 
       document.getElementById('guest-dropdown-btn').addEventListener('click', () => {
@@ -1809,14 +1964,17 @@ export function renderLandingPage(props: LandingViewProps): string {
         if (guestCount < 8) { guestCount++; updateGuestUI(); }
       });
 
-      document.getElementById('bar-search-btn').addEventListener('click', () => {
+      document.getElementById('bar-search-btn').addEventListener('click', async () => {
         const btn = document.getElementById('bar-search-btn');
         const label = btn.querySelector('span');
         if (label) {
           label.textContent = 'Memperbarui...';
-          setTimeout(() => { label.textContent = 'Cek Ketersediaan'; }, 600);
         }
+        await syncRoomsLive(false);
         renderRooms();
+        if (label) {
+          label.textContent = 'Cek Ketersediaan';
+        }
         document.getElementById('suites').scrollIntoView({ behavior: 'smooth' });
         showToast('Ketersediaan Diperbarui', 'Menampilkan suite untuk ' + guestCount + ' tamu.');
       });
@@ -1897,11 +2055,13 @@ export function renderLandingPage(props: LandingViewProps): string {
       document.getElementById('detail-close-desktop').addEventListener('click', closeDetailModal);
       document.getElementById('detail-close-footer').addEventListener('click', closeDetailModal);
       document.getElementById('detail-reserve-btn').addEventListener('click', () => {
-        if (activeRoom && activeRoom.status_ketersediaan === 'Pemeliharaan') {
-          showToast('Kamar Dalam Pemeliharaan', 'Silakan pilih unit suite lain yang tersedia.', true);
+        const latestRoom = activeRoom ? (ROOMS_DATA.find((r) => r.id_kamar === activeRoom.id_kamar) || activeRoom) : null;
+        const block = getRoomBlockInfo(latestRoom);
+        if (block) {
+          showToast(block.toastTitle, block.toastDesc, true);
           return;
         }
-        const targetId = activeRoom ? activeRoom.id_kamar : null;
+        const targetId = latestRoom ? latestRoom.id_kamar : null;
         closeDetailModal();
         if (targetId) openBookingModal(targetId);
       });
@@ -1909,8 +2069,17 @@ export function renderLandingPage(props: LandingViewProps): string {
       document.getElementById('booking-backdrop').addEventListener('click', () => { if (bookingStep !== 3) closeBookingModal(); });
       document.getElementById('booking-close-btn').addEventListener('click', closeBookingModal);
       document.getElementById('bm-cancel-btn').addEventListener('click', closeBookingModal);
-      document.getElementById('bm-done-btn').addEventListener('click', () => { closeBookingModal(); window.location.reload(); });
+      document.getElementById('bm-done-btn').addEventListener('click', () => {
+        closeBookingModal();
+        syncRoomsLive(false);
+      });
       document.getElementById('bm-next-btn').addEventListener('click', () => {
+        const latestRoom = activeRoom ? (ROOMS_DATA.find((r) => r.id_kamar === activeRoom.id_kamar) || activeRoom) : null;
+        const block = getRoomBlockInfo(latestRoom);
+        if (block) {
+          showToast(block.toastTitle, block.toastDesc, true);
+          return;
+        }
         const ci = document.getElementById('bm-checkin').value;
         const co = document.getElementById('bm-checkout').value;
         const d1 = parseUtcDate(ci);
@@ -1933,6 +2102,7 @@ export function renderLandingPage(props: LandingViewProps): string {
           }
         }
         updateBookingSummary();
+        syncRoomsLive(false, ci, coEl.value);
       });
       document.getElementById('bm-checkout').addEventListener('change', () => {
         const ci = document.getElementById('bm-checkin').value;
@@ -1942,6 +2112,7 @@ export function renderLandingPage(props: LandingViewProps): string {
           showToast('Tanggal Disesuaikan', 'Tanggal Check-Out minimal 1 malam setelah Check-In.');
         }
         updateBookingSummary();
+        syncRoomsLive(false, ci, coEl.value);
       });
       document.getElementById('bm-promo').addEventListener('input', updateBookingSummary);
 
@@ -1949,7 +2120,16 @@ export function renderLandingPage(props: LandingViewProps): string {
         e.preventDefault();
         if (!activeRoom) return;
 
+        const latestRoom = ROOMS_DATA.find((r) => r.id_kamar === activeRoom.id_kamar) || activeRoom;
+        const block = getRoomBlockInfo(latestRoom);
         const errBox = document.getElementById('bm-error-box');
+        if (block) {
+          errBox.textContent = block.toastDesc;
+          errBox.classList.remove('hidden');
+          showToast(block.toastTitle, block.toastDesc, true);
+          return;
+        }
+
         errBox.classList.add('hidden');
         const submitBtn = document.getElementById('bm-submit-btn');
         submitBtn.disabled = true;
@@ -1979,19 +2159,60 @@ export function renderLandingPage(props: LandingViewProps): string {
           }
 
           const d = json.data;
+          const issuedAt = d.created_at ? new Date(d.created_at) : new Date();
+          const formattedTime = Number.isNaN(issuedAt.getTime())
+            ? String(d.created_at || '')
+            : issuedAt.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+
           document.getElementById('voucher-code').textContent = d.kode_booking;
+          document.getElementById('voucher-ref').textContent = d.nomor_referensi || ('PAY-' + d.kode_booking);
+          document.getElementById('voucher-time').textContent = formattedTime;
+          document.getElementById('voucher-status').textContent =
+            String(d.status_reservasi || 'Dikonfirmasi') + ' · ' + String(d.status_pembayaran || 'Lunas').toUpperCase();
+
+          document.getElementById('voucher-guest').textContent =
+            d.nama_tamu + ' · ' + d.telepon_tamu + (d.kota_asal ? ' (' + d.kota_asal + ')' : '');
           document.getElementById('voucher-guest-email').textContent = 'Kwitansi diterbitkan untuk ' + d.email_tamu;
-          document.getElementById('voucher-room').textContent = d.nama_kamar + ' (No. ' + d.nomor_kamar + ')';
-          document.getElementById('voucher-dates').textContent = d.tgl_checkin + ' s/d ' + d.tgl_checkout + ' (' + d.jumlah_malam + ' Malam)';
-          document.getElementById('voucher-guest').textContent = d.nama_tamu + ' · ' + d.telepon_tamu;
-          document.getElementById('voucher-payment').textContent = d.metode_pembayaran + ' · Status: ' + d.status_pembayaran;
-          document.getElementById('voucher-total').textContent = fmtCurrency(Number(d.total_tagihan), 'IDR');
+          document.getElementById('voucher-room').textContent =
+            d.nama_kamar + ' (No. ' + d.nomor_kamar + ')' + (d.nama_kategori ? ' · ' + d.nama_kategori : '');
+          document.getElementById('voucher-dates').textContent =
+            d.tgl_checkin + ' s/d ' + d.tgl_checkout + ' (' + d.jumlah_malam + ' Malam)';
+          document.getElementById('voucher-guests').textContent = (d.jumlah_tamu || guestCount) + ' Tamu';
+
+          const notesRow = document.getElementById('voucher-notes-row');
+          const notesEl = document.getElementById('voucher-notes');
+          if (d.catatan_khusus && String(d.catatan_khusus).trim() !== '') {
+            notesEl.textContent = String(d.catatan_khusus);
+            notesRow.classList.remove('hidden');
+          } else {
+            notesEl.textContent = '';
+            notesRow.classList.add('hidden');
+          }
+
+          document.getElementById('voucher-subtotal').textContent = fmtCurrency(Number(d.subtotal || 0), 'IDR');
+          const diskonAmt = Number(d.potongan_diskon || 0);
+          const discRow = document.getElementById('voucher-discount-row');
+          if (diskonAmt > 0) {
+            document.getElementById('voucher-discount-code').textContent = String(d.kode_promo || 'PROMO');
+            document.getElementById('voucher-discount').textContent = '-' + fmtCurrency(diskonAmt, 'IDR');
+            discRow.classList.remove('hidden');
+          } else {
+            discRow.classList.add('hidden');
+          }
+          document.getElementById('voucher-service').textContent = fmtCurrency(Number(d.biaya_layanan || 0), 'IDR');
+          document.getElementById('voucher-tax').textContent = fmtCurrency(Number(d.pajak_ppn || 0), 'IDR');
+          document.getElementById('voucher-total').textContent = fmtCurrency(Number(d.total_tagihan || 0), 'IDR');
+          document.getElementById('voucher-payment').textContent =
+            d.metode_pembayaran + ' · Status: ' + String(d.status_pembayaran || 'Lunas').toUpperCase();
+          document.getElementById('bm-receipt-link').href = '/reservasi/kwitansi/' + encodeURIComponent(d.kode_booking);
 
           setBookingStep(3);
-          showToast('Reservasi Tersimpan', 'Kode booking ' + d.kode_booking + ' berhasil dikunci.');
+          syncRoomsLive(false);
+          showToast('Reservasi Tersimpan', 'Struk & kode booking ' + d.kode_booking + ' berhasil diterbitkan.');
         } catch (err) {
           errBox.textContent = err.message;
           errBox.classList.remove('hidden');
+          syncRoomsLive(false);
           showToast('Reservasi Gagal', err.message, true);
         } finally {
           submitBtn.disabled = false;
@@ -2021,6 +2242,121 @@ export function renderLandingPage(props: LandingViewProps): string {
           document.getElementById('concierge-form').classList.remove('hidden');
         });
       }
+
+      const rdbmsTabs = document.querySelectorAll('.rdbms-sql-tab');
+      const rdbmsPanels = document.querySelectorAll('.rdbms-sql-panel');
+      rdbmsTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const targetId = tab.getAttribute('data-sql-tab');
+          rdbmsTabs.forEach((t) => {
+            const isSelected = t === tab;
+            t.setAttribute('aria-selected', String(isSelected));
+            t.classList.toggle('bg-white', isSelected);
+            t.classList.toggle('text-[#0F1F17]', isSelected);
+            t.classList.toggle('shadow-xs', isSelected);
+            t.classList.toggle('text-slate-600', !isSelected);
+          });
+          rdbmsPanels.forEach((panel) => {
+            panel.classList.toggle('hidden', panel.getAttribute('data-sql-panel') !== targetId);
+          });
+        });
+      });
+
+      document.querySelectorAll('.copy-sql-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-copy-sql');
+          const codeEl = id ? document.getElementById('sql-code-' + id) : null;
+          if (!codeEl) return;
+          const text = codeEl.textContent || '';
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              const ta = document.createElement('textarea');
+              ta.value = text;
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              ta.remove();
+            }
+            const orig = btn.textContent;
+            btn.textContent = '✓ Tersalin';
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+            showToast('SQL Disalin', 'Cuplikan SQL berhasil disalin ke papan klip.');
+          } catch {
+            showToast('Gagal Menyalin', 'Silakan sorot dan salin cuplikan SQL secara manual.', true);
+          }
+        });
+      });
+
+      const TRG_SIM_STATES = {
+        insert: {
+          name: 'trg_update_ketersediaan_kamar',
+          ev: 'Event: AFTER INSERT',
+          room: 'Tersedia',
+          roomNote: 'Jadwal dikunci lewat tanggal, kamar fisik masih siap sebelum Check-In.',
+          transition: 'Baru → Dikonfirmasi',
+          desc: 'Reservasi baru dibuat dengan status awal: Dikonfirmasi',
+        },
+        checkin: {
+          name: 'trg_log_perubahan_reservasi',
+          ev: 'Event: AFTER UPDATE',
+          room: 'Terisi',
+          roomNote: 'Trigger otomatis mengubah status kamar fisik menjadi Terisi saat tamu masuk.',
+          transition: 'Dikonfirmasi → Check-In',
+          desc: 'Perubahan status otomatis oleh Trigger: Dikonfirmasi -> Check-In',
+        },
+        checkout: {
+          name: 'trg_log_perubahan_reservasi',
+          ev: 'Event: AFTER UPDATE',
+          room: 'Pemeliharaan',
+          roomNote: 'Setelah Check-Out, kamar otomatis ditandai Pemeliharaan untuk housekeeping.',
+          transition: 'Check-In → Selesai',
+          desc: 'Perubahan status otomatis oleh Trigger: Check-In -> Selesai',
+        },
+        cancel: {
+          name: 'trg_log_perubahan_reservasi',
+          ev: 'Event: AFTER UPDATE',
+          room: 'Tersedia',
+          roomNote: 'Pembatalan dari status Check-In otomatis melepaskan kamar kembali Tersedia.',
+          transition: 'Check-In → Batal',
+          desc: 'Perubahan status otomatis oleh Trigger: Check-In -> Batal',
+        },
+      };
+
+      const trgButtons = document.querySelectorAll('.trg-sim-btn');
+      trgButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-trg-sim');
+          const st = key ? TRG_SIM_STATES[key] : null;
+          if (!st) return;
+          trgButtons.forEach((b) => {
+            const active = b === btn;
+            b.classList.toggle('bg-[#007A33]', active);
+            b.classList.toggle('text-white', active);
+            b.classList.toggle('bg-white', !active);
+            b.classList.toggle('border', !active);
+            b.classList.toggle('border-slate-300', !active);
+            b.classList.toggle('text-slate-700', !active);
+          });
+          document.getElementById('trg-sim-name').textContent = st.name;
+          document.getElementById('trg-sim-event').textContent = st.ev;
+          document.getElementById('trg-sim-room').textContent = st.room;
+          document.getElementById('trg-sim-room-note').textContent = st.roomNote;
+          document.getElementById('trg-sim-audit-transition').textContent = st.transition;
+          document.getElementById('trg-sim-audit-desc').textContent = st.desc;
+        });
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) syncRoomsLive(true);
+      });
+      window.addEventListener('focus', () => syncRoomsLive(true));
+      setInterval(() => {
+        if (!document.hidden) syncRoomsLive(true);
+      }, 5000);
 
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
