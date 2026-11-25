@@ -6,7 +6,10 @@ import {
   assertSupabaseConfigured,
   checkHealth,
   getSupabaseConfigError,
+  getSupabaseConnectionMode,
   hasDatabaseConfig,
+  hasPgDatabaseConfig,
+  hasSupabaseApiConfig,
   SUPABASE_NOT_CONFIGURED_MSG,
 } from './src/server/db.ts';
 import {
@@ -332,24 +335,32 @@ app.get('/promo/cek', async (req: Request, res: Response) => {
   }
 });
 
-// Health Check Supabase PostgreSQL
+// Health Check Supabase (PostgreSQL Pooler & Supabase HTTPS API)
 app.get('/api/health', async (_req: Request, res: Response) => {
   try {
-    const { totalKamar } = await checkHealth();
+    const { totalKamar, mode, pgError } = await checkHealth();
     res.json({
       status: 'healthy',
       provider: 'supabase',
+      mode,
       connected: true,
       runtime: `Node.js ${process.version} Express TypeScript`,
-      database: 'Supabase PostgreSQL (pg)',
+      database:
+        mode === 'pg'
+          ? 'Supabase PostgreSQL (pg)'
+          : 'Supabase REST API (@supabase/supabase-js)',
       totalKamar,
+      ...(pgError ? { pgFallbackNote: pgError } : {}),
     });
   } catch (err) {
     res.status(hasDatabaseConfig() ? 500 : 503).json({
       status: 'unhealthy',
       provider: 'supabase',
+      mode: getSupabaseConnectionMode(),
       connected: false,
       configured: hasDatabaseConfig(),
+      hasPgUrl: hasPgDatabaseConfig(),
+      hasSupabaseApi: hasSupabaseApiConfig(),
       error: err instanceof Error ? err.message : (getSupabaseConfigError() ?? SUPABASE_NOT_CONFIGURED_MSG),
     });
   }

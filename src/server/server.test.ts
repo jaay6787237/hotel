@@ -13,7 +13,11 @@ import {
   assertSupabaseConfigured,
   buildPoolConfig,
   checkHealth,
+  formatSupabasePgError,
+  getSupabaseConnectionMode,
   hasDatabaseConfig,
+  hasPgDatabaseConfig,
+  hasSupabaseApiConfig,
   parseSupabaseConnectionString,
   pool,
   SUPABASE_NOT_CONFIGURED_MSG,
@@ -129,7 +133,7 @@ test('isRoomBookableStatus allows only Tersedia and blocks Terisi and Pemelihara
   assert.equal(isRoomBookableStatus(''), false);
 });
 
-test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and placeholders) and fails fast when unconfigured', async () => {
+test('hasDatabaseConfig supports Supabase pg URLs and Supabase API fallback, ignores SQL_HOST and placeholders', async () => {
   const keys = [
     'DATABASE_URL',
     'POSTGRES_URL',
@@ -139,12 +143,20 @@ test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and place
     'DB_HOST',
     'POSTGRES_HOST',
     'SQL_HOST',
+    'SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'VITE_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_ANON_KEY',
   ] as const;
   const backup = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
 
   try {
     for (const k of keys) delete process.env[k];
     assert.equal(hasDatabaseConfig(), false);
+    assert.equal(getSupabaseConnectionMode(), 'unconfigured');
     assert.throws(() => assertSupabaseConfigured(), (err: Error) => err.message === SUPABASE_NOT_CONFIGURED_MSG);
     await assert.rejects(() => checkHealth(), (err: Error) => err.message === SUPABASE_NOT_CONFIGURED_MSG);
 
@@ -152,26 +164,29 @@ test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and place
     process.env.SQL_HOST = '10.0.0.1';
     assert.equal(hasDatabaseConfig(), false);
 
-    process.env.DB_HOST = 'aws-0-ap-southeast-1.pooler.supabase.com';
-    process.env.DATABASE_URL = 'postgresql://postgres.your-project-id:pw@host:6543/postgres';
-    // DATABASE_URL has placeholder so it is skipped, valid DB_HOST still makes config true
-    assert.equal(hasDatabaseConfig(), true);
-
-    delete process.env.DB_HOST;
-    assert.equal(hasDatabaseConfig(), false);
-
-    process.env.DATABASE_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
-    assert.equal(hasDatabaseConfig(), true);
-
-    // Placeholder [YOUR-DATABASE-PASSWORD] from Supabase UI must fail fast with clear guidance
+    // Placeholder [YOUR-DATABASE-PASSWORD] without API keys fails fast cleanly
     process.env.DATABASE_URL =
       'postgresql://postgres.exaheopeplazfmnftaxk:[YOUR-DATABASE-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres';
+    assert.equal(hasPgDatabaseConfig(), false);
     assert.equal(hasDatabaseConfig(), false);
     assert.throws(() => assertSupabaseConfigured(), (err: Error) => err.message === SUPABASE_PLACEHOLDER_PASSWORD_MSG);
 
-    delete process.env.DATABASE_URL;
-    process.env.SUPABASE_DB_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
+    // Adding SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY activates supabase-api mode even without DATABASE_URL
+    process.env.SUPABASE_URL = 'https://exaheopeplazfmnftaxk.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.testkey';
+    assert.equal(hasSupabaseApiConfig(), true);
+    assert.equal(getSupabaseConnectionMode(), 'supabase-api');
     assert.equal(hasDatabaseConfig(), true);
+    assert.doesNotThrow(() => assertSupabaseConfigured());
+
+    // Valid quoted DATABASE_URL switches mode to pg and strips surrounding quotes
+    process.env.DATABASE_URL =
+      '"postgresql://postgres.exaheopeplazfmnftaxk:RealPass123@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"';
+    assert.equal(hasPgDatabaseConfig(), true);
+    assert.equal(getSupabaseConnectionMode(), 'pg');
+    const quotedCfg = buildPoolConfig();
+    assert.equal(quotedCfg.host, 'aws-1-ap-southeast-1.pooler.supabase.com');
+    assert.equal(quotedCfg.password, 'RealPass123');
 
     const parsed = parseSupabaseConnectionString(
       'postgresql://postgres.exaheopeplazfmnftaxk:P@ss#123!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require'
@@ -185,13 +200,9 @@ test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and place
       isLocal: false,
     });
 
-    process.env.SUPABASE_DB_URL =
-      'postgresql://postgres.exaheopeplazfmnftaxk:P@ss#123!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require';
-    const poolCfg = buildPoolConfig();
-    assert.equal(poolCfg.host, 'aws-1-ap-southeast-1.pooler.supabase.com');
-    assert.equal(poolCfg.port, 6543);
-    assert.equal(poolCfg.password, 'P@ss#123!');
-    assert.deepEqual(poolCfg.ssl, { rejectUnauthorized: false });
+    assert.ok(formatSupabasePgError({ code: '28P01', message: 'password authentication failed' }).includes('Password'));
+    assert.ok(formatSupabasePgError(new Error('Tenant or user not found')).includes('postgres.<PROJECT_REF>'));
+    assert.ok(formatSupabasePgError({ code: '42P01', message: 'relation "public.kamar" does not exist' }).includes('supabase_schema.sql'));
   } finally {
     for (const k of keys) {
       if (backup[k] === undefined) delete process.env[k];
@@ -208,7 +219,7 @@ test('vercel.json rewrites dynamic traffic to /api/index while letting static pu
     rewrites?: Array<{ source: string; destination: string }>;
   };
   assert.equal(cfg.outputDirectory, 'public');
-  assert.equal(cfg.functions?.['api/index.ts']?.includeFiles, '{src/server/**,public/**}');
+  assert.equal(cfg.functions?.['api/index.ts']?.includeFiles, '{src/server/**,src/lib/**,public/**}');
   assert.equal(cfg.rewrites?.[0]?.destination, '/api/index');
   assert.ok(cfg.rewrites?.[0]?.source.includes('assets/'));
 });

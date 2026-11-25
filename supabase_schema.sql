@@ -577,3 +577,19 @@ BEGIN
         );
     END IF;
 END $$;
+
+-- ---------------------------------------------------------------------
+-- 8. IZIN AKSES SUPABASE API & POOLER (AMAN UNTUK SQL EDITOR & HEIDISQL)
+-- ---------------------------------------------------------------------
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role, authenticated, anon;
+        GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role, authenticated, anon;
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role, authenticated, anon;
+        GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO service_role, authenticated, anon;
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;

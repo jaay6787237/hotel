@@ -1,5 +1,11 @@
 import type { PoolClient } from 'pg';
-import { pool } from './db.ts';
+import {
+  assertSupabaseConfigured,
+  formatSupabasePgError,
+  hasPgDatabaseConfig,
+  hasSupabaseApiConfig,
+  pool,
+} from './db.ts';
 import {
   calculateReservationPricing,
   generateBookingCode,
@@ -7,144 +13,93 @@ import {
   isValidStayRange,
   resolveNextRoomStatus,
 } from './pricing.ts';
+import {
+  type AuditLogRow,
+  type CategoryRow,
+  InvalidInputError,
+  KamarKotorException,
+  KamarPenuhException,
+  type KpiMetrics,
+  type PromoRow,
+  type ReservationReportRow,
+  type RoomRow,
+  type SubqueryAnalytics,
+  VoucherTidakValidException,
+} from './hotelTypes.ts';
+import {
+  restBatalkanReservasi,
+  restBuatReservasiBaru,
+  restCekKetersediaanKamar,
+  restCreateRoom,
+  restDeleteRoom,
+  restFindByKodeBooking,
+  restFindRoomById,
+  restGetActivePromos,
+  restGetAnalitikSubquery,
+  restGetAuditLogs,
+  restGetCategories,
+  restGetKpiMetrics,
+  restGetLaporanMultiJoin,
+  restGetRoomsWithAvailability,
+  restGetRoomsWithCategory,
+  restProsesCheckIn,
+  restProsesCheckOut,
+  restUpdateRoomStatus,
+  restValidatePromoCode,
+} from './supabaseRest.ts';
 
-export class KamarPenuhException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'KamarPenuhException';
+export {
+  type AuditLogRow,
+  type CategoryRow,
+  InvalidInputError,
+  KamarKotorException,
+  KamarPenuhException,
+  type KpiMetrics,
+  type PromoRow,
+  type ReservationReportRow,
+  type RoomRow,
+  type SubqueryAnalytics,
+  VoucherTidakValidException,
+};
+
+function isPgTransportOrAuthError(err: unknown): boolean {
+  if (
+    err instanceof KamarPenuhException ||
+    err instanceof KamarKotorException ||
+    err instanceof VoucherTidakValidException ||
+    err instanceof InvalidInputError
+  ) {
+    return false;
   }
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: unknown }).code) : '';
+  return (
+    ['28P01', 'ENETUNREACH', 'EAI_AGAIN', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(code) ||
+    msg.includes('tenant or user not found') ||
+    msg.includes('password authentication failed') ||
+    msg.includes('connection terminated') ||
+    msg.includes('timeout') ||
+    msg.includes('enetunreach')
+  );
 }
 
-export class KamarKotorException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'KamarKotorException';
+async function runSupabase<T>(pgFn: () => Promise<T>, restFn: () => Promise<T>): Promise<T> {
+  assertSupabaseConfigured();
+  if (!hasPgDatabaseConfig() && hasSupabaseApiConfig()) {
+    return restFn();
   }
-}
-
-export class VoucherTidakValidException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'VoucherTidakValidException';
+  try {
+    return await pgFn();
+  } catch (err) {
+    if (hasSupabaseApiConfig() && isPgTransportOrAuthError(err)) {
+      console.warn('[Supabase] pg Pooler error, beralih ke Supabase HTTPS API:', formatSupabasePgError(err));
+      return restFn();
+    }
+    if (isPgTransportOrAuthError(err)) {
+      throw new Error(formatSupabasePgError(err));
+    }
+    throw err;
   }
-}
-
-export class InvalidInputError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvalidInputError';
-  }
-}
-
-export interface RoomRow {
-  id_kamar: number;
-  kode_kamar: string;
-  id_kategori: number;
-  nomor_kamar: string;
-  nama_kamar: string;
-  tagline: string | null;
-  deskripsi: string | null;
-  tarif_per_malam: string | number;
-  kapasitas_tamu: number;
-  luas_m2: number;
-  tipe_kasur: string;
-  pemandangan: string;
-  fasilitas: string;
-  fasilitas_array: string[];
-  url_gambar: string;
-  is_featured: boolean;
-  status_ketersediaan: string;
-  is_bookable?: boolean;
-  kode_kategori: string;
-  nama_kategori: string;
-  tipe_pemandangan?: string;
-}
-
-export interface CategoryRow {
-  id_kategori: number;
-  kode_kategori: string;
-  nama_kategori: string;
-  deskripsi: string | null;
-  kapasitas_maks: number;
-  tipe_pemandangan: string;
-}
-
-export interface PromoRow {
-  id_voucher: number;
-  kode_promo: string;
-  nama_promo: string;
-  persen_diskon: number;
-  maks_diskon: string | number;
-  berlaku_hingga: string;
-  is_active: boolean;
-}
-
-export interface ReservationReportRow {
-  id_reservasi: number;
-  kode_booking: string;
-  nama_tamu: string;
-  email_tamu: string;
-  telepon_tamu: string;
-  kota_asal: string | null;
-  id_kamar: number;
-  kode_kamar: string;
-  nomor_kamar: string;
-  nama_kamar: string;
-  status_kamar: string;
-  kode_kategori: string;
-  nama_kategori: string;
-  kode_promo: string;
-  nama_promo: string;
-  persen_diskon: number;
-  tgl_checkin: string;
-  tgl_checkout: string;
-  jumlah_malam: number;
-  jumlah_tamu: number;
-  catatan_khusus: string | null;
-  subtotal: string | number;
-  potongan_diskon: string | number;
-  biaya_layanan: string | number;
-  pajak_ppn: string | number;
-  total_tagihan: string | number;
-  status_reservasi: string;
-  metode_pembayaran: string;
-  status_pembayaran: string;
-  nomor_referensi: string;
-  created_at: string;
-  tipe_tagihan_oop?: string;
-}
-
-export interface AuditLogRow {
-  id_log: number;
-  id_reservasi: number;
-  kode_booking: string | null;
-  status_lama: string | null;
-  status_baru: string;
-  keterangan: string | null;
-  waktu_perubahan: string;
-}
-
-export interface KpiMetrics {
-  total_kamar: number;
-  kamar_terisi: number;
-  kamar_tersedia: number;
-  kamar_pemeliharaan: number;
-  okupansi_persen: number;
-  reservasi_aktif: number;
-  pendapatan_lunas: number;
-}
-
-export interface SubqueryAnalytics {
-  rata_rata_tarif: number;
-  kamar_premium: Array<{
-    id_kamar: number;
-    kode_kamar: string;
-    nomor_kamar: string;
-    nama_kamar: string;
-    tarif_per_malam: string | number;
-    status_ketersediaan: string;
-    nama_kategori: string;
-  }>;
 }
 
 function parseFacilities(raw: unknown): string[] {
@@ -259,6 +214,10 @@ const MULTI_JOIN_SELECT = `
 `;
 
 export async function getRoomsWithCategory(): Promise<RoomRow[]> {
+  return runSupabase(pgGetRoomsWithCategory, restGetRoomsWithCategory);
+}
+
+async function pgGetRoomsWithCategory(): Promise<RoomRow[]> {
   const res = await pool.query<Record<string, unknown>>(
     `SELECT k.*, kk.kode_kategori, kk.nama_kategori, kk.tipe_pemandangan
      FROM public.kamar k
@@ -281,7 +240,17 @@ export async function getRoomsWithAvailability(
   tglCheckin?: string,
   tglCheckout?: string
 ): Promise<RoomRow[]> {
-  const rooms = await getRoomsWithCategory();
+  return runSupabase(
+    () => pgGetRoomsWithAvailability(tglCheckin, tglCheckout),
+    () => restGetRoomsWithAvailability(tglCheckin, tglCheckout)
+  );
+}
+
+async function pgGetRoomsWithAvailability(
+  tglCheckin?: string,
+  tglCheckout?: string
+): Promise<RoomRow[]> {
+  const rooms = await pgGetRoomsWithCategory();
   if (!tglCheckin || !tglCheckout || !isValidStayRange(tglCheckin, tglCheckout)) {
     return rooms;
   }
@@ -302,6 +271,10 @@ export async function getRoomsWithAvailability(
 }
 
 export async function findRoomById(idKamar: number): Promise<RoomRow | null> {
+  return runSupabase(() => pgFindRoomById(idKamar), () => restFindRoomById(idKamar));
+}
+
+async function pgFindRoomById(idKamar: number): Promise<RoomRow | null> {
   const res = await pool.query<Record<string, unknown>>(
     `SELECT k.*, kk.kode_kategori, kk.nama_kategori
      FROM public.kamar k
@@ -324,20 +297,28 @@ export async function findRoomById(idKamar: number): Promise<RoomRow | null> {
 }
 
 export async function getCategories(): Promise<CategoryRow[]> {
-  const res = await pool.query<CategoryRow>('SELECT * FROM public.kategori_kamar ORDER BY id_kategori ASC');
-  return res.rows;
+  return runSupabase(async () => {
+    const res = await pool.query<CategoryRow>('SELECT * FROM public.kategori_kamar ORDER BY id_kategori ASC');
+    return res.rows;
+  }, restGetCategories);
 }
 
 export async function getActivePromos(): Promise<PromoRow[]> {
-  const res = await pool.query<PromoRow>(
-    `SELECT * FROM public.voucher_promo
-     WHERE is_active = TRUE AND berlaku_hingga >= CURRENT_DATE
-     ORDER BY persen_diskon DESC`
-  );
-  return res.rows;
+  return runSupabase(async () => {
+    const res = await pool.query<PromoRow>(
+      `SELECT * FROM public.voucher_promo
+       WHERE is_active = TRUE AND berlaku_hingga >= CURRENT_DATE
+       ORDER BY persen_diskon DESC`
+    );
+    return res.rows;
+  }, restGetActivePromos);
 }
 
 export async function validatePromoCode(kodePromo: string): Promise<PromoRow> {
+  return runSupabase(() => pgValidatePromoCode(kodePromo), () => restValidatePromoCode(kodePromo));
+}
+
+async function pgValidatePromoCode(kodePromo: string): Promise<PromoRow> {
   const clean = kodePromo.trim().toUpperCase();
   if (!clean) {
     throw new VoucherTidakValidException('Kode promo tidak boleh kosong.');
@@ -360,6 +341,17 @@ export async function validatePromoCode(kodePromo: string): Promise<PromoRow> {
 }
 
 export async function cekKetersediaanKamar(
+  idKamar: number,
+  tglCheckin: string,
+  tglCheckout: string
+): Promise<boolean> {
+  return runSupabase(
+    () => pgCekKetersediaanKamar(idKamar, tglCheckin, tglCheckout),
+    () => restCekKetersediaanKamar(idKamar, tglCheckin, tglCheckout)
+  );
+}
+
+async function pgCekKetersediaanKamar(
   idKamar: number,
   tglCheckin: string,
   tglCheckout: string
@@ -399,6 +391,10 @@ export async function cekKetersediaanKamar(
 }
 
 export async function findByKodeBooking(kodeBooking: string): Promise<ReservationReportRow | null> {
+  return runSupabase(() => pgFindByKodeBooking(kodeBooking), () => restFindByKodeBooking(kodeBooking));
+}
+
+async function pgFindByKodeBooking(kodeBooking: string): Promise<ReservationReportRow | null> {
   const clean = kodeBooking.trim();
   if (!clean) return null;
   try {
@@ -420,6 +416,10 @@ export async function findByKodeBooking(kodeBooking: string): Promise<Reservatio
 }
 
 export async function getLaporanMultiJoin(): Promise<ReservationReportRow[]> {
+  return runSupabase(pgGetLaporanMultiJoin, restGetLaporanMultiJoin);
+}
+
+async function pgGetLaporanMultiJoin(): Promise<ReservationReportRow[]> {
   try {
     const res = await pool.query<Record<string, unknown>>(
       'SELECT * FROM public.vw_laporan_reservasi_lengkap'
@@ -437,6 +437,10 @@ export async function getLaporanMultiJoin(): Promise<ReservationReportRow[]> {
 }
 
 export async function getKpiMetrics(): Promise<KpiMetrics> {
+  return runSupabase(pgGetKpiMetrics, restGetKpiMetrics);
+}
+
+async function pgGetKpiMetrics(): Promise<KpiMetrics> {
   const kamarRes = await pool.query<Record<string, string>>(
     `SELECT
        COUNT(*)::text AS total_kamar,
@@ -473,24 +477,30 @@ export async function getKpiMetrics(): Promise<KpiMetrics> {
 }
 
 export async function getAnalitikSubquery(): Promise<SubqueryAnalytics> {
-  const avgRes = await pool.query<{ rata_rata: string }>(
-    'SELECT ROUND(AVG(tarif_per_malam), 2)::text AS rata_rata FROM public.kamar'
-  );
-  const premRes = await pool.query<SubqueryAnalytics['kamar_premium'][number]>(
-    `SELECT k.id_kamar, k.kode_kamar, k.nomor_kamar, k.nama_kamar, k.tarif_per_malam,
-            k.status_ketersediaan, kk.nama_kategori
-     FROM public.kamar k
-     INNER JOIN public.kategori_kamar kk ON k.id_kategori = kk.id_kategori
-     WHERE k.tarif_per_malam > (SELECT AVG(tarif_per_malam) FROM public.kamar)
-     ORDER BY k.tarif_per_malam DESC`
-  );
-  return {
-    rata_rata_tarif: Number(avgRes.rows[0]?.rata_rata ?? 0),
-    kamar_premium: premRes.rows,
-  };
+  return runSupabase(async () => {
+    const avgRes = await pool.query<{ rata_rata: string }>(
+      'SELECT ROUND(AVG(tarif_per_malam), 2)::text AS rata_rata FROM public.kamar'
+    );
+    const premRes = await pool.query<SubqueryAnalytics['kamar_premium'][number]>(
+      `SELECT k.id_kamar, k.kode_kamar, k.nomor_kamar, k.nama_kamar, k.tarif_per_malam,
+              k.status_ketersediaan, kk.nama_kategori
+       FROM public.kamar k
+       INNER JOIN public.kategori_kamar kk ON k.id_kategori = kk.id_kategori
+       WHERE k.tarif_per_malam > (SELECT AVG(tarif_per_malam) FROM public.kamar)
+       ORDER BY k.tarif_per_malam DESC`
+    );
+    return {
+      rata_rata_tarif: Number(avgRes.rows[0]?.rata_rata ?? 0),
+      kamar_premium: premRes.rows,
+    };
+  }, restGetAnalitikSubquery);
 }
 
 export async function getAuditLogs(limit = 20): Promise<AuditLogRow[]> {
+  return runSupabase(() => pgGetAuditLogs(limit), () => restGetAuditLogs(limit));
+}
+
+async function pgGetAuditLogs(limit = 20): Promise<AuditLogRow[]> {
   const res = await pool.query<Record<string, unknown>>(
     'SELECT * FROM public.log_audit_reservasi ORDER BY waktu_perubahan DESC, id_log DESC LIMIT $1',
     [limit]
@@ -554,6 +564,10 @@ async function recordAuditIfNoTrigger(
 }
 
 export async function buatReservasiBaru(input: Record<string, unknown>): Promise<ReservationReportRow | Record<string, unknown>> {
+  return runSupabase(() => pgBuatReservasiBaru(input), () => restBuatReservasiBaru(input));
+}
+
+async function pgBuatReservasiBaru(input: Record<string, unknown>): Promise<ReservationReportRow | Record<string, unknown>> {
   const idKamar = Number(input.id_kamar ?? 0);
   const tglCheckin = String(input.tgl_checkin ?? '').trim();
   const tglCheckout = String(input.tgl_checkout ?? '').trim();
@@ -579,7 +593,7 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
   const d2 = new Date(`${tglCheckout}T00:00:00Z`);
   const jumlahMalam = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
 
-  const kamar = await findRoomById(idKamar);
+  const kamar = await pgFindRoomById(idKamar);
   if (!kamar) {
     throw new Error('Kamar yang dipilih tidak ditemukan.');
   }
@@ -592,7 +606,7 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
     );
   }
 
-  const tersedia = await cekKetersediaanKamar(idKamar, tglCheckin, tglCheckout);
+  const tersedia = await pgCekKetersediaanKamar(idKamar, tglCheckin, tglCheckout);
   if (!tersedia) {
     throw new KamarPenuhException(
       `Kamar ${kamar.nomor_kamar} (${kamar.nama_kamar}) sudah dipesan pada rentang tanggal ${tglCheckin} s/d ${tglCheckout}.`
@@ -602,7 +616,7 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
   let persenDiskon = 0;
   let maksDiskon = 0;
   if (kodePromo !== '') {
-    const promo = await validatePromoCode(kodePromo);
+    const promo = await pgValidatePromoCode(kodePromo);
     persenDiskon = Number(promo.persen_diskon);
     maksDiskon = Number(promo.maks_diskon);
   }
@@ -728,7 +742,7 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
     }
   }
 
-  const detail = await findByKodeBooking(kodeBooking);
+  const detail = await pgFindByKodeBooking(kodeBooking);
   if (detail) {
     detail.tipe_tagihan_oop = pricing.tipe_tagihan;
     return detail;
@@ -761,6 +775,10 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
 }
 
 export async function prosesCheckIn(idReservasi: number): Promise<void> {
+  return runSupabase(() => pgProsesCheckIn(idReservasi), () => restProsesCheckIn(idReservasi));
+}
+
+async function pgProsesCheckIn(idReservasi: number): Promise<void> {
   const client = await pool.connect();
   const onClientErr = (clientErr: Error) => {
     console.error('[PostgreSQL Client] Error during prosesCheckIn:', clientErr.message);
@@ -829,6 +847,10 @@ export async function prosesCheckIn(idReservasi: number): Promise<void> {
 }
 
 export async function prosesCheckOut(idReservasi: number): Promise<void> {
+  return runSupabase(() => pgProsesCheckOut(idReservasi), () => restProsesCheckOut(idReservasi));
+}
+
+async function pgProsesCheckOut(idReservasi: number): Promise<void> {
   try {
     await pool.query('CALL public.sp_proses_check_out($1)', [idReservasi]);
   } catch (err) {
@@ -890,6 +912,10 @@ export async function prosesCheckOut(idReservasi: number): Promise<void> {
 }
 
 export async function batalkanReservasi(idReservasi: number): Promise<void> {
+  return runSupabase(() => pgBatalkanReservasi(idReservasi), () => restBatalkanReservasi(idReservasi));
+}
+
+async function pgBatalkanReservasi(idReservasi: number): Promise<void> {
   const client = await pool.connect();
   const onClientErr = (clientErr: Error) => {
     console.error('[PostgreSQL Client] Error during batalkanReservasi:', clientErr.message);
@@ -947,6 +973,10 @@ export async function batalkanReservasi(idReservasi: number): Promise<void> {
 }
 
 export async function createRoom(data: Record<string, unknown>): Promise<number> {
+  return runSupabase(() => pgCreateRoom(data), () => restCreateRoom(data));
+}
+
+async function pgCreateRoom(data: Record<string, unknown>): Promise<number> {
   const kodeKamar = String(data.kode_kamar ?? '').trim().toUpperCase();
   const nomorKamar = String(data.nomor_kamar ?? '').trim();
   const namaKamar = String(data.nama_kamar ?? '').trim();
@@ -998,6 +1028,10 @@ export async function createRoom(data: Record<string, unknown>): Promise<number>
 }
 
 export async function updateRoomStatus(idKamar: number, status: string): Promise<void> {
+  return runSupabase(() => pgUpdateRoomStatus(idKamar, status), () => restUpdateRoomStatus(idKamar, status));
+}
+
+async function pgUpdateRoomStatus(idKamar: number, status: string): Promise<void> {
   if (!Number.isInteger(idKamar) || idKamar <= 0) {
     throw new InvalidInputError('ID kamar tidak valid.');
   }
@@ -1014,6 +1048,10 @@ export async function updateRoomStatus(idKamar: number, status: string): Promise
 }
 
 export async function deleteRoom(idKamar: number): Promise<void> {
+  return runSupabase(() => pgDeleteRoom(idKamar), () => restDeleteRoom(idKamar));
+}
+
+async function pgDeleteRoom(idKamar: number): Promise<void> {
   if (!Number.isInteger(idKamar) || idKamar <= 0) {
     throw new InvalidInputError('ID kamar tidak valid.');
   }

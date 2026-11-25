@@ -1,17 +1,26 @@
 import 'dotenv/config';
 import pg from 'pg';
+import { getSupabaseAdmin, isUsingSupabaseApi } from '../lib/supabase-admin.ts';
 
 const { Pool } = pg;
 
 export const SUPABASE_NOT_CONFIGURED_MSG =
-  'Database Supabase belum terhubung. Tambahkan DATABASE_URL (atau SUPABASE_DB_URL / DB_HOST, DB_USER, DB_PASS) di file .env atau Vercel Environment Variables.';
+  'Database Supabase belum terhubung. Tambahkan DATABASE_URL (atau SUPABASE_URL & SUPABASE_SERVICE_ROLE_KEY) di file .env atau Vercel Environment Variables.';
 
 export const SUPABASE_PLACEHOLDER_PASSWORD_MSG =
   'Password di DATABASE_URL Supabase masih berupa placeholder [YOUR-DATABASE-PASSWORD]. Ganti bagian tersebut dengan password database Supabase asli Anda (tanpa tanda kurung siku [ ]).';
 
 function env(key: string, fallback = ''): string {
-  const val = process.env[key];
-  return val !== undefined && val !== '' ? val.trim() : fallback;
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') return fallback;
+  let trimmed = raw.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    trimmed = trimmed.slice(1, -1).trim();
+  }
+  return trimmed !== '' ? trimmed : fallback;
 }
 
 function hasPlaceholderPassword(val: string): boolean {
@@ -69,7 +78,13 @@ export interface ParsedSupabaseUrl {
 }
 
 export function parseSupabaseConnectionString(connStr: string): ParsedSupabaseUrl | null {
-  const trimmed = connStr.trim();
+  let trimmed = connStr.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    trimmed = trimmed.slice(1, -1).trim();
+  }
   const schemeIdx = trimmed.indexOf('://');
   if (schemeIdx === -1) return null;
 
@@ -112,11 +127,27 @@ export function parseSupabaseConnectionString(connStr: string): ParsedSupabaseUr
   return { host, port, database, user, password, isLocal };
 }
 
-export function hasDatabaseConfig(): boolean {
+export function hasPgDatabaseConfig(): boolean {
   if (firstValidConnString() !== '') return true;
   const host = env('DB_HOST') || env('POSTGRES_HOST');
   const pass = env('DB_PASS') || env('POSTGRES_PASSWORD');
   return host !== '' && !isPlaceholder(host) && !hasPlaceholderPassword(pass);
+}
+
+export function hasSupabaseApiConfig(): boolean {
+  return isUsingSupabaseApi();
+}
+
+export type SupabaseConnectionMode = 'pg' | 'supabase-api' | 'unconfigured';
+
+export function getSupabaseConnectionMode(): SupabaseConnectionMode {
+  if (hasPgDatabaseConfig()) return 'pg';
+  if (hasSupabaseApiConfig()) return 'supabase-api';
+  return 'unconfigured';
+}
+
+export function hasDatabaseConfig(): boolean {
+  return getSupabaseConnectionMode() !== 'unconfigured';
 }
 
 export function getSupabaseConfigError(): string | null {
@@ -136,6 +167,29 @@ export function assertSupabaseConfigured(): void {
   }
 }
 
+export function formatSupabasePgError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: unknown }).code) : '';
+  const lower = msg.toLowerCase();
+
+  if (code === '42P01' || lower.includes('relation "public.kamar" does not exist') || lower.includes("table 'public.kamar'")) {
+    return "Koneksi ke Supabase berhasil, tetapi tabel 'public.kamar' belum ada. Jalankan seluruh isi supabase_schema.sql di Supabase SQL Editor.";
+  }
+  if (code === '28P01' || lower.includes('password authentication failed')) {
+    return 'Password DATABASE_URL Supabase salah atau tidak cocok. Periksa kembali password di Supabase → Project Settings → Database (atau reset database password).';
+  }
+  if (lower.includes('tenant or user not found')) {
+    return 'Username / host Pooler Supabase tidak cocok (Tenant or user not found). Pastikan user menggunakan format postgres.<PROJECT_REF> sesuai Connection String Supabase.';
+  }
+  if (code === 'ENETUNREACH' || code === 'EAI_AGAIN' || code === 'ENOTFOUND' || lower.includes('enetunreach')) {
+    return 'Host PostgreSQL tidak dapat dijangkau. Untuk Vercel/Serverless gunakan Supabase Pooler (port 6543, *.pooler.supabase.com), bukan direct host db.*.supabase.co.';
+  }
+  if (lower.includes('timeout') || code === 'ETIMEDOUT') {
+    return 'Koneksi ke Supabase PostgreSQL timeout. Pastikan port Pooler 6543/5432 dan password DATABASE_URL sudah benar.';
+  }
+  return msg;
+}
+
 export function buildPoolConfig(): pg.PoolConfig {
   const isVercel = Boolean(process.env.VERCEL);
   const idleTimeoutMillis = isVercel ? 10000 : 15000;
@@ -153,7 +207,7 @@ export function buildPoolConfig(): pg.PoolConfig {
         ssl: parsed.isLocal ? undefined : { rejectUnauthorized: false },
         max: isVercel ? 3 : 10,
         idleTimeoutMillis,
-        connectionTimeoutMillis: 8000,
+        connectionTimeoutMillis: 10000,
         keepAlive: true,
         keepAliveInitialDelayMillis: 10000,
         allowExitOnIdle: isVercel,
@@ -166,7 +220,7 @@ export function buildPoolConfig(): pg.PoolConfig {
       ssl: isLocal ? undefined : { rejectUnauthorized: false },
       max: isVercel ? 3 : 10,
       idleTimeoutMillis,
-      connectionTimeoutMillis: 8000,
+      connectionTimeoutMillis: 10000,
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000,
       allowExitOnIdle: isVercel,
@@ -190,7 +244,7 @@ export function buildPoolConfig(): pg.PoolConfig {
     ssl: isLocal ? undefined : { rejectUnauthorized: false },
     max: isVercel ? 3 : 10,
     idleTimeoutMillis,
-    connectionTimeoutMillis: 8000,
+    connectionTimeoutMillis: 10000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
     allowExitOnIdle: isVercel,
@@ -205,19 +259,53 @@ pool.on('error', (err) => {
   console.error('[Supabase Pool] Idle client connection error:', err.message);
 });
 
-export async function checkHealth(): Promise<{ totalKamar: number }> {
-  assertSupabaseConfigured();
-  await pool.query('SELECT 1');
-  try {
-    const res = await pool.query<{ total: string }>('SELECT COUNT(*)::text AS total FROM public.kamar');
-    return { totalKamar: Number(res.rows[0]?.total ?? 0) };
-  } catch (err) {
-    const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: unknown }).code) : '';
-    if (code === '42P01') {
+async function checkSupabaseRestHealth(): Promise<{ totalKamar: number; mode: 'supabase-api' }> {
+  const client = getSupabaseAdmin();
+  if (!client) {
+    throw new Error(SUPABASE_NOT_CONFIGURED_MSG);
+  }
+  const { count, error } = await client
+    .from('kamar')
+    .select('id_kamar', { count: 'exact', head: true });
+
+  if (error) {
+    const code = String((error as { code?: unknown }).code ?? '');
+    if (code === '42P01' || code === 'PGRST205' || error.message.includes('kamar')) {
       throw new Error(
-        "Koneksi ke Supabase PostgreSQL berhasil, tetapi tabel 'public.kamar' belum ada. Jalankan seluruh script supabase_schema.sql di Supabase SQL Editor."
+        "Koneksi ke Supabase API berhasil, tetapi tabel 'public.kamar' belum ada. Jalankan seluruh isi supabase_schema.sql di Supabase SQL Editor."
       );
     }
-    throw err;
+    throw new Error(`Supabase API Error (${code || 'unknown'}): ${error.message}`);
   }
+
+  return { totalKamar: Number(count ?? 0), mode: 'supabase-api' };
+}
+
+export async function checkHealth(): Promise<{
+  totalKamar: number;
+  mode: 'pg' | 'supabase-api';
+  pgError?: string;
+}> {
+  assertSupabaseConfigured();
+
+  if (hasPgDatabaseConfig()) {
+    try {
+      await pool.query('SELECT 1');
+      const res = await pool.query<{ total: string }>('SELECT COUNT(*)::text AS total FROM public.kamar');
+      return { totalKamar: Number(res.rows[0]?.total ?? 0), mode: 'pg' };
+    } catch (pgErr) {
+      const formattedPgErr = formatSupabasePgError(pgErr);
+      if (hasSupabaseApiConfig()) {
+        try {
+          const restRes = await checkSupabaseRestHealth();
+          return { ...restRes, pgError: formattedPgErr };
+        } catch {
+          throw new Error(formattedPgErr);
+        }
+      }
+      throw new Error(formattedPgErr);
+    }
+  }
+
+  return checkSupabaseRestHealth();
 }

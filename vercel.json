@@ -6,7 +6,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{src/server/**,public/**}"
+      "includeFiles": "{src/server/**,src/lib/**,public/**}"
     }
   },
   "rewrites": [
