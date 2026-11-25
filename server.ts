@@ -5,6 +5,7 @@ import express, { type Request, type Response } from 'express';
 import {
   assertSupabaseConfigured,
   checkHealth,
+  getSupabaseConfigError,
   hasDatabaseConfig,
   SUPABASE_NOT_CONFIGURED_MSG,
 } from './src/server/db.ts';
@@ -349,7 +350,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
       provider: 'supabase',
       connected: false,
       configured: hasDatabaseConfig(),
-      error: err instanceof Error ? err.message : SUPABASE_NOT_CONFIGURED_MSG,
+      error: err instanceof Error ? err.message : (getSupabaseConfigError() ?? SUPABASE_NOT_CONFIGURED_MSG),
     });
   }
 });

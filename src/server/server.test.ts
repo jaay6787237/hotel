@@ -11,10 +11,13 @@ import {
 } from './auth.ts';
 import {
   assertSupabaseConfigured,
+  buildPoolConfig,
   checkHealth,
   hasDatabaseConfig,
+  parseSupabaseConnectionString,
   pool,
   SUPABASE_NOT_CONFIGURED_MSG,
+  SUPABASE_PLACEHOLDER_PASSWORD_MSG,
 } from './db.ts';
 import {
   calculateReservationPricing,
@@ -160,9 +163,35 @@ test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and place
     process.env.DATABASE_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
     assert.equal(hasDatabaseConfig(), true);
 
+    // Placeholder [YOUR-DATABASE-PASSWORD] from Supabase UI must fail fast with clear guidance
+    process.env.DATABASE_URL =
+      'postgresql://postgres.exaheopeplazfmnftaxk:[YOUR-DATABASE-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres';
+    assert.equal(hasDatabaseConfig(), false);
+    assert.throws(() => assertSupabaseConfigured(), (err: Error) => err.message === SUPABASE_PLACEHOLDER_PASSWORD_MSG);
+
     delete process.env.DATABASE_URL;
     process.env.SUPABASE_DB_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
     assert.equal(hasDatabaseConfig(), true);
+
+    const parsed = parseSupabaseConnectionString(
+      'postgresql://postgres.exaheopeplazfmnftaxk:P@ss#123!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require'
+    );
+    assert.deepEqual(parsed, {
+      host: 'aws-1-ap-southeast-1.pooler.supabase.com',
+      port: 6543,
+      database: 'postgres',
+      user: 'postgres.exaheopeplazfmnftaxk',
+      password: 'P@ss#123!',
+      isLocal: false,
+    });
+
+    process.env.SUPABASE_DB_URL =
+      'postgresql://postgres.exaheopeplazfmnftaxk:P@ss#123!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require';
+    const poolCfg = buildPoolConfig();
+    assert.equal(poolCfg.host, 'aws-1-ap-southeast-1.pooler.supabase.com');
+    assert.equal(poolCfg.port, 6543);
+    assert.equal(poolCfg.password, 'P@ss#123!');
+    assert.deepEqual(poolCfg.ssl, { rejectUnauthorized: false });
   } finally {
     for (const k of keys) {
       if (backup[k] === undefined) delete process.env[k];
