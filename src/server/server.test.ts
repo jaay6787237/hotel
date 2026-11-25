@@ -9,7 +9,13 @@ import {
   verifyAdminCredentials,
   verifySignedToken,
 } from './auth.ts';
-import { hasDatabaseConfig } from './db.ts';
+import {
+  assertSupabaseConfigured,
+  checkHealth,
+  hasDatabaseConfig,
+  pool,
+  SUPABASE_NOT_CONFIGURED_MSG,
+} from './db.ts';
 import {
   calculateReservationPricing,
   generateBookingCode,
@@ -120,7 +126,7 @@ test('isRoomBookableStatus allows only Tersedia and blocks Terisi and Pemelihara
   assert.equal(isRoomBookableStatus(''), false);
 });
 
-test('hasDatabaseConfig supports DATABASE_URL and ignores placeholder DB_HOST values', () => {
+test('hasDatabaseConfig only accepts Supabase config (ignores SQL_HOST and placeholders) and fails fast when unconfigured', async () => {
   const keys = [
     'DATABASE_URL',
     'POSTGRES_URL',
@@ -136,6 +142,12 @@ test('hasDatabaseConfig supports DATABASE_URL and ignores placeholder DB_HOST va
   try {
     for (const k of keys) delete process.env[k];
     assert.equal(hasDatabaseConfig(), false);
+    assert.throws(() => assertSupabaseConfigured(), (err: Error) => err.message === SUPABASE_NOT_CONFIGURED_MSG);
+    await assert.rejects(() => checkHealth(), (err: Error) => err.message === SUPABASE_NOT_CONFIGURED_MSG);
+
+    // Cloud SQL env var must NOT satisfy Supabase-only configuration
+    process.env.SQL_HOST = '10.0.0.1';
+    assert.equal(hasDatabaseConfig(), false);
 
     process.env.DB_HOST = 'aws-0-ap-southeast-1.pooler.supabase.com';
     process.env.DATABASE_URL = 'postgresql://postgres.your-project-id:pw@host:6543/postgres';
@@ -146,6 +158,10 @@ test('hasDatabaseConfig supports DATABASE_URL and ignores placeholder DB_HOST va
     assert.equal(hasDatabaseConfig(), false);
 
     process.env.DATABASE_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
+    assert.equal(hasDatabaseConfig(), true);
+
+    delete process.env.DATABASE_URL;
+    process.env.SUPABASE_DB_URL = 'postgresql://postgres.abcdef:secret@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
     assert.equal(hasDatabaseConfig(), true);
   } finally {
     for (const k of keys) {
@@ -208,5 +224,13 @@ test('SSR landing and dashboard pages render critical sync and receipt markup wi
   });
   assert.ok(dashboardHtml.includes('/api/admin/sync'));
   assert.ok(dashboardHtml.includes('kamar_pemeliharaan'));
+  assert.ok(dashboardHtml.includes('Terhubung langsung ke Supabase PostgreSQL'));
   assert.equal(/\bwindow\.(alert|open)\s*\(/.test(dashboardHtml), false);
+});
+
+test('PostgreSQL pool registers an error listener so idle disconnects do not crash Node', () => {
+  assert.ok(pool.listenerCount('error') >= 1);
+  assert.doesNotThrow(() => {
+    pool.emit('error', new Error('Connection terminated unexpectedly'), undefined as never);
+  });
 });

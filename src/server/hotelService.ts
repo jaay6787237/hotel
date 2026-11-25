@@ -641,6 +641,11 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
     }
 
     const client = await pool.connect();
+    const onClientErr = (clientErr: Error) => {
+      console.error('[PostgreSQL Client] Error during buatReservasiBaru:', clientErr.message);
+    };
+    client.on('error', onClientErr);
+    let txError = false;
     try {
       await client.query('BEGIN');
 
@@ -714,10 +719,12 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
 
       await client.query('COMMIT');
     } catch (txErr) {
-      await client.query('ROLLBACK');
+      txError = true;
+      await client.query('ROLLBACK').catch(() => undefined);
       throw txErr;
     } finally {
-      client.release();
+      client.off('error', onClientErr);
+      client.release(txError);
     }
   }
 
@@ -755,6 +762,11 @@ export async function buatReservasiBaru(input: Record<string, unknown>): Promise
 
 export async function prosesCheckIn(idReservasi: number): Promise<void> {
   const client = await pool.connect();
+  const onClientErr = (clientErr: Error) => {
+    console.error('[PostgreSQL Client] Error during prosesCheckIn:', clientErr.message);
+  };
+  client.on('error', onClientErr);
+  let txError = false;
   try {
     const res = await client.query<{
       id_reservasi: number;
@@ -807,10 +819,12 @@ export async function prosesCheckIn(idReservasi: number): Promise<void> {
     }
     await client.query('COMMIT');
   } catch (err) {
+    txError = true;
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;
   } finally {
-    client.release();
+    client.off('error', onClientErr);
+    client.release(txError);
   }
 }
 
@@ -822,6 +836,11 @@ export async function prosesCheckOut(idReservasi: number): Promise<void> {
       throw err;
     }
     const client = await pool.connect();
+    const onClientErr = (clientErr: Error) => {
+      console.error('[PostgreSQL Client] Error during prosesCheckOut:', clientErr.message);
+    };
+    client.on('error', onClientErr);
+    let txError = false;
     try {
       const q = await client.query<{
         id_kamar: number;
@@ -860,16 +879,23 @@ export async function prosesCheckOut(idReservasi: number): Promise<void> {
       }
       await client.query('COMMIT');
     } catch (txErr) {
+      txError = true;
       await client.query('ROLLBACK').catch(() => undefined);
       throw txErr;
     } finally {
-      client.release();
+      client.off('error', onClientErr);
+      client.release(txError);
     }
   }
 }
 
 export async function batalkanReservasi(idReservasi: number): Promise<void> {
   const client = await pool.connect();
+  const onClientErr = (clientErr: Error) => {
+    console.error('[PostgreSQL Client] Error during batalkanReservasi:', clientErr.message);
+  };
+  client.on('error', onClientErr);
+  let txError = false;
   try {
     const q = await client.query<{
       id_kamar: number;
@@ -911,10 +937,12 @@ export async function batalkanReservasi(idReservasi: number): Promise<void> {
     }
     await client.query('COMMIT');
   } catch (err) {
+    txError = true;
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;
   } finally {
-    client.release();
+    client.off('error', onClientErr);
+    client.release(txError);
   }
 }
 

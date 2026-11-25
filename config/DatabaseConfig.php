@@ -77,28 +77,24 @@ class DatabaseConfig
 
     private function connect(): void
     {
-        $dbHost = self::env('DB_HOST');
-        $dbPort = self::env('DB_PORT', '5432');
-        $dbName = self::env('DB_NAME', 'postgres');
-        $dbUser = self::env('DB_USER', 'postgres');
-        $dbPass = self::env('DB_PASS', '');
+        $databaseUrl = self::env('DATABASE_URL', self::env('SUPABASE_DB_URL'));
+        if ($databaseUrl !== '' && !str_contains($databaseUrl, 'your-project-id')) {
+            $parsed = parse_url($databaseUrl);
+            $dbHost = $parsed['host'] ?? '';
+            $dbPort = (string) ($parsed['port'] ?? '6543');
+            $dbName = isset($parsed['path']) ? ltrim($parsed['path'], '/') : 'postgres';
+            $dbUser = isset($parsed['user']) ? urldecode($parsed['user']) : 'postgres';
+            $dbPass = isset($parsed['pass']) ? urldecode($parsed['pass']) : '';
+        } else {
+            $dbHost = self::env('DB_HOST');
+            $dbPort = self::env('DB_PORT', '6543');
+            $dbName = self::env('DB_NAME', 'postgres');
+            $dbUser = self::env('DB_USER', 'postgres');
+            $dbPass = self::env('DB_PASS', '');
+        }
 
-        // Fallback otomatis untuk pengembangan/pratinjau Cloud SQL lokal bila DB_HOST belum diisi
-        if ($dbHost === '' || str_contains($dbHost, 'your-project-id')) {
-            $sqlHost = self::env('SQL_HOST');
-            $sqlDb   = self::env('SQL_DB_NAME');
-            $sqlUser = self::env('SQL_USER');
-            $sqlPass = self::env('SQL_PASSWORD');
-
-            if ($sqlHost !== '' && $sqlDb !== '' && $sqlUser !== '') {
-                $dbHost = $sqlHost;
-                $dbPort = '5432';
-                $dbName = $sqlDb;
-                $dbUser = $sqlUser;
-                $dbPass = $sqlPass;
-            } else {
-                $dbHost = '127.0.0.1';
-            }
+        if ($dbHost === '' || str_contains($dbHost, 'your-project-id') || str_contains($dbHost, 'your-supabase')) {
+            throw new \RuntimeException('Database Supabase belum terhubung. Tambahkan DATABASE_URL atau DB_HOST, DB_USER, DB_PASS Supabase Anda.');
         }
 
         $isUnixSocket = str_starts_with($dbHost, '/');
@@ -151,7 +147,7 @@ class DatabaseConfig
                 $this->pdo->exec($sql);
             }
         } catch (\Throwable $e) {
-            // Pada Cloud SQL dengan user non-owner, DDL dikelola oleh migrasi skema.
+            // Skema Supabase dikelola via Supabase SQL Editor (supabase_schema.sql).
         }
     }
 

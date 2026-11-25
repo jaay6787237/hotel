@@ -118,7 +118,7 @@ export function renderLandingPage(props: LandingViewProps): string {
   const dbErrorHtml = dbError
     ? `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
         <div class="p-4 rounded-lg border bg-amber-50 border-amber-300 text-amber-900 text-xs">
-          <strong>Peringatan Koneksi Basis Data PostgreSQL:</strong> ${escapeHtml(dbError)}
+          <strong>Peringatan Koneksi Supabase PostgreSQL:</strong> ${escapeHtml(dbError)}
         </div>
       </div>`
     : '';

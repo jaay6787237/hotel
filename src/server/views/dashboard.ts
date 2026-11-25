@@ -308,7 +308,7 @@ export function renderDashboardPage(props: DashboardViewProps): string {
           <span class="text-xs font-semibold uppercase tracking-widest text-[#007A33]">Ringkasan Operasional Real-Time</span>
           <h1 class="text-2xl sm:text-3xl font-serif font-bold text-[#0F1F17]">Dashboard Front Office Resor</h1>
         </div>
-        <span class="text-xs text-slate-500">Terhubung langsung ke PostgreSQL Cloud SQL</span>
+        <span class="text-xs text-slate-500">Terhubung langsung ke Supabase PostgreSQL</span>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

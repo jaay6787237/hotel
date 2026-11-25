@@ -2,7 +2,12 @@ import 'dotenv/config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
-import { checkHealth } from './src/server/db.ts';
+import {
+  assertSupabaseConfigured,
+  checkHealth,
+  hasDatabaseConfig,
+  SUPABASE_NOT_CONFIGURED_MSG,
+} from './src/server/db.ts';
 import {
   ADMIN_COOKIE_NAME,
   consumeFlash,
@@ -84,6 +89,7 @@ app.get('/', async (req: Request, res: Response) => {
   const defaultCheckOut = formatYmdOffset(9);
 
   try {
+    assertSupabaseConfigured();
     [rooms, promos] = await Promise.all([
       getRoomsWithAvailability(defaultCheckIn, defaultCheckOut),
       getActivePromos(),
@@ -123,6 +129,7 @@ app.get('/api/rooms', async (req: Request, res: Response) => {
   const checkin = String(req.query.checkin ?? '').trim();
   const checkout = String(req.query.checkout ?? '').trim();
   try {
+    assertSupabaseConfigured();
     const rooms = await getRoomsWithAvailability(checkin || undefined, checkout || undefined);
     res.setHeader('Cache-Control', 'no-store');
     res.json({
@@ -131,7 +138,7 @@ app.get('/api/rooms', async (req: Request, res: Response) => {
       serverTime: new Date().toISOString(),
     });
   } catch (err) {
-    res.status(500).json({
+    res.status(hasDatabaseConfig() ? 500 : 503).json({
       success: false,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -141,6 +148,7 @@ app.get('/api/rooms', async (req: Request, res: Response) => {
 // Endpoint API Reservasi & Promo Publik
 const handleCreateReservation = async (req: Request, res: Response) => {
   try {
+    assertSupabaseConfigured();
     const data = await buatReservasiBaru((req.body ?? {}) as Record<string, unknown>);
     res.status(201).json({
       success: true,
@@ -161,7 +169,7 @@ const handleCreateReservation = async (req: Request, res: Response) => {
       return;
     }
     const msg = err instanceof Error ? err.message : String(err);
-    let status = 500;
+    let status = hasDatabaseConfig() ? 500 : 503;
     let outMsg = msg;
     if (msg.includes('TANGGAL_TIDAK_VALID')) {
       status = 400;
@@ -190,6 +198,7 @@ const handleLookupReservation = async (req: Request, res: Response) => {
     return;
   }
   try {
+    assertSupabaseConfigured();
     const data = await findByKodeBooking(kode);
     if (!data) {
       res.status(404).json({
@@ -200,7 +209,7 @@ const handleLookupReservation = async (req: Request, res: Response) => {
     }
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({
+    res.status(hasDatabaseConfig() ? 500 : 503).json({
       success: false,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -218,6 +227,7 @@ app.get('/reservasi/kwitansi/:kode', async (req: Request, res: Response) => {
     return;
   }
   try {
+    assertSupabaseConfigured();
     const data = await findByKodeBooking(kode);
     if (!data) {
       res.status(404).send('Kwitansi tidak ditemukan.');
@@ -299,13 +309,14 @@ app.get('/reservasi/kwitansi/:kode', async (req: Request, res: Response) => {
 </body>
 </html>`);
   } catch (err) {
-    res.status(500).send(err instanceof Error ? err.message : String(err));
+    res.status(hasDatabaseConfig() ? 500 : 503).send(err instanceof Error ? err.message : String(err));
   }
 });
 
 app.get('/promo/cek', async (req: Request, res: Response) => {
   const kode = String(req.query.kode ?? '').trim();
   try {
+    assertSupabaseConfigured();
     const data = await validatePromoCode(kode);
     res.json({ success: true, data });
   } catch (err) {
@@ -313,27 +324,32 @@ app.get('/promo/cek', async (req: Request, res: Response) => {
       res.status(400).json({ success: false, error: err.message });
       return;
     }
-    res.status(500).json({
+    res.status(hasDatabaseConfig() ? 500 : 503).json({
       success: false,
       error: err instanceof Error ? err.message : String(err),
     });
   }
 });
 
-// Health Check PostgreSQL
+// Health Check Supabase PostgreSQL
 app.get('/api/health', async (_req: Request, res: Response) => {
   try {
     const { totalKamar } = await checkHealth();
     res.json({
       status: 'healthy',
+      provider: 'supabase',
+      connected: true,
       runtime: `Node.js ${process.version} Express TypeScript`,
-      database: process.env.SQL_HOST ? 'PostgreSQL Cloud SQL (pg)' : 'PostgreSQL Supabase / Remote (pg)',
+      database: 'Supabase PostgreSQL (pg)',
       totalKamar,
     });
   } catch (err) {
-    res.status(500).json({
+    res.status(hasDatabaseConfig() ? 500 : 503).json({
       status: 'unhealthy',
-      error: err instanceof Error ? err.message : String(err),
+      provider: 'supabase',
+      connected: false,
+      configured: hasDatabaseConfig(),
+      error: err instanceof Error ? err.message : SUPABASE_NOT_CONFIGURED_MSG,
     });
   }
 });
@@ -398,6 +414,7 @@ const dashboardHandler = async (req: Request, res: Response) => {
   if (!session) return;
 
   try {
+    assertSupabaseConfigured();
     const [kpi, reservations, rooms, categories, subqueryAnalytics, auditLogs] = await Promise.all([
       getKpiMetrics(),
       getLaporanMultiJoin(),
@@ -422,8 +439,8 @@ const dashboardHandler = async (req: Request, res: Response) => {
       })
     );
   } catch (err) {
-    res.status(500).type('html').send(
-      `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Error Dashboard</title></head><body><h1>Gagal Memuat Dashboard</h1><p>${err instanceof Error ? err.message : String(err)}</p></body></html>`
+    res.status(hasDatabaseConfig() ? 500 : 503).type('html').send(
+      `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Koneksi Supabase Belum Siap</title></head><body><h1>Gagal Memuat Dashboard</h1><p>${err instanceof Error ? err.message : String(err)}</p></body></html>`
     );
   }
 };
@@ -438,11 +455,12 @@ app.get('/api/admin/sync', async (req: Request, res: Response) => {
     return;
   }
   try {
+    assertSupabaseConfigured();
     const snapshot = await getAdminSyncSnapshot();
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, ...snapshot });
   } catch (err) {
-    res.status(500).json({
+    res.status(hasDatabaseConfig() ? 500 : 503).json({
       success: false,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -453,6 +471,7 @@ app.post('/admin/reservasi/checkin', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   const idReservasi = Number(req.body?.id_reservasi ?? 0);
   try {
+    assertSupabaseConfigured();
     await prosesCheckIn(idReservasi);
     setFlash(res, req, 'success', `Check-In reservasi #${idReservasi} berhasil diproses.`);
   } catch (err) {
@@ -469,6 +488,7 @@ app.post('/admin/reservasi/checkout', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   const idReservasi = Number(req.body?.id_reservasi ?? 0);
   try {
+    assertSupabaseConfigured();
     await prosesCheckOut(idReservasi);
     setFlash(
       res,
@@ -486,6 +506,7 @@ app.post('/admin/reservasi/batal', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   const idReservasi = Number(req.body?.id_reservasi ?? 0);
   try {
+    assertSupabaseConfigured();
     await batalkanReservasi(idReservasi);
     setFlash(res, req, 'success', `Reservasi #${idReservasi} dibatalkan dan dicatat oleh Audit Log.`);
   } catch (err) {
@@ -497,6 +518,7 @@ app.post('/admin/reservasi/batal', async (req: Request, res: Response) => {
 app.post('/admin/kamar/tambah', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   try {
+    assertSupabaseConfigured();
     await createRoom((req.body ?? {}) as Record<string, unknown>);
     setFlash(res, req, 'success', 'Unit kamar baru berhasil ditambahkan ke inventaris resort.');
   } catch (err) {
@@ -510,6 +532,7 @@ app.post('/admin/kamar/status', async (req: Request, res: Response) => {
   const idKamar = Number(req.body?.id_kamar ?? 0);
   const status = String(req.body?.status_ketersediaan ?? 'Tersedia');
   try {
+    assertSupabaseConfigured();
     await updateRoomStatus(idKamar, status);
     setFlash(res, req, 'success', `Status unit kamar #${idKamar} diperbarui menjadi '${status}'.`);
   } catch (err) {
@@ -522,6 +545,7 @@ app.post('/admin/kamar/hapus', async (req: Request, res: Response) => {
   if (!requireAdminOrRedirect(req, res)) return;
   const idKamar = Number(req.body?.id_kamar ?? 0);
   try {
+    assertSupabaseConfigured();
     await deleteRoom(idKamar);
     setFlash(res, req, 'success', `Unit kamar #${idKamar} berhasil dihapus.`);
   } catch (err) {
