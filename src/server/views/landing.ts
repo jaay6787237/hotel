@@ -489,7 +489,7 @@ export function renderLandingPage(props: LandingViewProps): string {
       <a href="#dining" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Restoran Bukit</a>
       <a href="#experiences" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Kebugaran &amp; Spa</a>
       <a href="#cek-booking" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Cek Booking</a>
-      <a href="#arsitektur-db" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Arsitektur SQL (SP, SF, Trigger)</a>
+      <a href="#arsitektur-db" aria-hidden="true" tabindex="-1" class="mobile-nav-link hidden py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Arsitektur SQL (SP, SF, Trigger)</a>
       <a href="#location" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Lokasi &amp; Kontak</a>
       <a href="/admin/login" class="block py-2 text-base font-semibold text-[#007A33]">Login Portal Admin</a>
       <button
