@@ -287,9 +287,6 @@ export function renderDashboardPage(props: DashboardViewProps): string {
       </div>
 
       <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-        <a href="/#arsitektur-db" class="btn-press hidden md:inline-flex px-3.5 py-2 text-xs font-medium text-[#D4AF37] hover:text-white border border-[#D4AF37]/40 rounded-md transition-colors whitespace-nowrap shrink-0">
-          Penjelasan SQL
-        </a>
         <a href="/" class="btn-press px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-medium text-slate-200 hover:text-white border border-white/20 rounded-md transition-colors whitespace-nowrap shrink-0">
           <span class="hidden sm:inline">Lihat </span>Web Tamu
         </a>

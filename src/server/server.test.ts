@@ -17,7 +17,6 @@ import {
   isValidStayRange,
   resolveNextRoomStatus,
 } from './pricing.ts';
-import { renderRdbmsArchitectureSection } from './views/rdbmsSection.ts';
 import { renderLandingPage } from './views/landing.ts';
 import { renderDashboardPage } from './views/dashboard.ts';
 
@@ -121,26 +120,6 @@ test('isRoomBookableStatus allows only Tersedia and blocks Terisi and Pemelihara
   assert.equal(isRoomBookableStatus(''), false);
 });
 
-test('renderRdbmsArchitectureSection renders SF, SP, Trigger, Multi-Join View, Subquery, and 7-table schema explanations', () => {
-  const html = renderRdbmsArchitectureSection();
-  for (const needle of [
-    'id="arsitektur-db"',
-    'sf_hitung_total_tagihan',
-    'sf_cek_ketersediaan_kamar',
-    'sp_buat_reservasi_baru',
-    'sp_proses_check_out',
-    'trg_update_ketersediaan_kamar',
-    'trg_log_perubahan_reservasi',
-    'vw_laporan_reservasi_lengkap',
-    'Scalar Subquery',
-    'log_audit_reservasi',
-    'data-trg-sim="checkin"',
-    'data-sql-tab="multijoin"',
-  ]) {
-    assert.ok(html.includes(needle), `Missing expected RDBMS section token: ${needle}`);
-  }
-});
-
 test('hasDatabaseConfig supports DATABASE_URL and ignores placeholder DB_HOST values', () => {
   const keys = [
     'DATABASE_URL',
@@ -205,6 +184,8 @@ test('SSR landing and dashboard pages render critical sync and receipt markup wi
   const step1Idx = landingHtml.indexOf('id="booking-step-1"');
   assert.ok(errIdx > 0 && step1Idx > 0 && errIdx < step1Idx, 'bm-error-box must precede booking-step-1');
   assert.ok(landingHtml.includes('id="printable-voucher"'));
+  assert.equal(landingHtml.includes('arsitektur-db'), false);
+  assert.equal(landingHtml.includes('Arsitektur SQL'), false);
   assert.equal(/\bwindow\.(alert|open)\s*\(/.test(landingHtml), false);
 
   const dashboardHtml = renderDashboardPage({

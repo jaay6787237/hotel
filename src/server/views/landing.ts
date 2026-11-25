@@ -1,7 +1,6 @@
 import type { FlashMessage } from '../auth.ts';
 import type { PromoRow, ReservationReportRow, RoomRow } from '../hotelService.ts';
 import { escapeHtml, formatRupiah, mapRoomToClientDto, safeJson } from './helpers.ts';
-import { renderRdbmsArchitectureSection } from './rdbmsSection.ts';
 
 export interface LandingViewProps {
   rooms: RoomRow[];
@@ -436,7 +435,6 @@ export function renderLandingPage(props: LandingViewProps): string {
           <a href="#suites" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Suite &amp; Villa</a>
           <a href="#dining" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Fasilitas</a>
           <a href="#cek-booking" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Cek Booking</a>
-          <a href="#arsitektur-db" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Arsitektur SQL</a>
           <a href="#location" class="hover:text-[#007A33] transition-colors whitespace-nowrap">Lokasi</a>
         </nav>
 
@@ -489,7 +487,6 @@ export function renderLandingPage(props: LandingViewProps): string {
       <a href="#dining" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Restoran Bukit</a>
       <a href="#experiences" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Kebugaran &amp; Spa</a>
       <a href="#cek-booking" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Cek Booking</a>
-      <a href="#arsitektur-db" aria-hidden="true" tabindex="-1" class="mobile-nav-link hidden py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Arsitektur SQL (SP, SF, Trigger)</a>
       <a href="#location" class="mobile-nav-link block py-2 text-base font-medium text-slate-800 hover:text-[#007A33]">Lokasi &amp; Kontak</a>
       <a href="/admin/login" class="block py-2 text-base font-semibold text-[#007A33]">Login Portal Admin</a>
       <button
@@ -935,9 +932,6 @@ export function renderLandingPage(props: LandingViewProps): string {
         </div>
       </div>
     </section>
-
-    <!-- ARSITEKTUR BASIS DATA: TRIGGER, SP, SF, MULTI-JOIN & SUBQUERY -->
-    ${renderRdbmsArchitectureSection()}
   </main>
 
   <!-- FOOTER -->
@@ -962,7 +956,6 @@ export function renderLandingPage(props: LandingViewProps): string {
             <li><a href="#suites" class="hover:text-white transition-colors">Grand Horizon Hillside Villa</a></li>
             <li><a href="#suites" class="hover:text-white transition-colors">Deluxe Panoramic Sanctuary</a></li>
             <li><a href="#cek-booking" class="hover:text-white transition-colors">Cek Kode Booking</a></li>
-            <li><a href="#arsitektur-db" class="hover:text-white transition-colors">Penjelasan SP, SF, Trigger &amp; Join</a></li>
             <li><a href="/admin/login" class="hover:text-[#D4AF37] text-emerald-400 font-semibold transition-colors">Portal Admin Front Office</a></li>
           </ul>
         </div>
@@ -979,7 +972,6 @@ export function renderLandingPage(props: LandingViewProps): string {
       <div class="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
         <p>&copy; ${currentYear} Bukit Randu Hotel &amp; Resort. Hak cipta dilindungi undang-undang.</p>
         <div class="flex items-center gap-6">
-          <a href="/Dokumentasi_RDBMS_Bukit_Randu.pdf" target="_blank" class="hover:text-slate-300">Dokumentasi SQL (PDF)</a>
           <a href="/admin/login" class="hover:text-slate-300">Admin Portal</a>
         </div>
       </div>
@@ -2242,113 +2234,6 @@ export function renderLandingPage(props: LandingViewProps): string {
           document.getElementById('concierge-form').classList.remove('hidden');
         });
       }
-
-      const rdbmsTabs = document.querySelectorAll('.rdbms-sql-tab');
-      const rdbmsPanels = document.querySelectorAll('.rdbms-sql-panel');
-      rdbmsTabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          const targetId = tab.getAttribute('data-sql-tab');
-          rdbmsTabs.forEach((t) => {
-            const isSelected = t === tab;
-            t.setAttribute('aria-selected', String(isSelected));
-            t.classList.toggle('bg-white', isSelected);
-            t.classList.toggle('text-[#0F1F17]', isSelected);
-            t.classList.toggle('shadow-xs', isSelected);
-            t.classList.toggle('text-slate-600', !isSelected);
-          });
-          rdbmsPanels.forEach((panel) => {
-            panel.classList.toggle('hidden', panel.getAttribute('data-sql-panel') !== targetId);
-          });
-        });
-      });
-
-      document.querySelectorAll('.copy-sql-btn').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-copy-sql');
-          const codeEl = id ? document.getElementById('sql-code-' + id) : null;
-          if (!codeEl) return;
-          const text = codeEl.textContent || '';
-          try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              await navigator.clipboard.writeText(text);
-            } else {
-              const ta = document.createElement('textarea');
-              ta.value = text;
-              ta.style.position = 'fixed';
-              ta.style.opacity = '0';
-              document.body.appendChild(ta);
-              ta.select();
-              document.execCommand('copy');
-              ta.remove();
-            }
-            const orig = btn.textContent;
-            btn.textContent = '✓ Tersalin';
-            setTimeout(() => { btn.textContent = orig; }, 1400);
-            showToast('SQL Disalin', 'Cuplikan SQL berhasil disalin ke papan klip.');
-          } catch {
-            showToast('Gagal Menyalin', 'Silakan sorot dan salin cuplikan SQL secara manual.', true);
-          }
-        });
-      });
-
-      const TRG_SIM_STATES = {
-        insert: {
-          name: 'trg_update_ketersediaan_kamar',
-          ev: 'Event: AFTER INSERT',
-          room: 'Tersedia',
-          roomNote: 'Jadwal dikunci lewat tanggal, kamar fisik masih siap sebelum Check-In.',
-          transition: 'Baru → Dikonfirmasi',
-          desc: 'Reservasi baru dibuat dengan status awal: Dikonfirmasi',
-        },
-        checkin: {
-          name: 'trg_log_perubahan_reservasi',
-          ev: 'Event: AFTER UPDATE',
-          room: 'Terisi',
-          roomNote: 'Trigger otomatis mengubah status kamar fisik menjadi Terisi saat tamu masuk.',
-          transition: 'Dikonfirmasi → Check-In',
-          desc: 'Perubahan status otomatis oleh Trigger: Dikonfirmasi -> Check-In',
-        },
-        checkout: {
-          name: 'trg_log_perubahan_reservasi',
-          ev: 'Event: AFTER UPDATE',
-          room: 'Pemeliharaan',
-          roomNote: 'Setelah Check-Out, kamar otomatis ditandai Pemeliharaan untuk housekeeping.',
-          transition: 'Check-In → Selesai',
-          desc: 'Perubahan status otomatis oleh Trigger: Check-In -> Selesai',
-        },
-        cancel: {
-          name: 'trg_log_perubahan_reservasi',
-          ev: 'Event: AFTER UPDATE',
-          room: 'Tersedia',
-          roomNote: 'Pembatalan dari status Check-In otomatis melepaskan kamar kembali Tersedia.',
-          transition: 'Check-In → Batal',
-          desc: 'Perubahan status otomatis oleh Trigger: Check-In -> Batal',
-        },
-      };
-
-      const trgButtons = document.querySelectorAll('.trg-sim-btn');
-      trgButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const key = btn.getAttribute('data-trg-sim');
-          const st = key ? TRG_SIM_STATES[key] : null;
-          if (!st) return;
-          trgButtons.forEach((b) => {
-            const active = b === btn;
-            b.classList.toggle('bg-[#007A33]', active);
-            b.classList.toggle('text-white', active);
-            b.classList.toggle('bg-white', !active);
-            b.classList.toggle('border', !active);
-            b.classList.toggle('border-slate-300', !active);
-            b.classList.toggle('text-slate-700', !active);
-          });
-          document.getElementById('trg-sim-name').textContent = st.name;
-          document.getElementById('trg-sim-event').textContent = st.ev;
-          document.getElementById('trg-sim-room').textContent = st.room;
-          document.getElementById('trg-sim-room-note').textContent = st.roomNote;
-          document.getElementById('trg-sim-audit-transition').textContent = st.transition;
-          document.getElementById('trg-sim-audit-desc').textContent = st.desc;
-        });
-      });
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) syncRoomsLive(true);
